@@ -18,7 +18,7 @@ export async function renderReport(view, inspectionId) {
   const recs = buildRecords(insp, { photoName: (id) => { if (!names.has(id)) names.set(id, `Foto ${names.size + 1}`); return names.get(id); } });
 
   const main = h('main', { class: 'main' });
-  clear(view, topbar({ back: `#/s/${manhole.id}`, title: 'Schachtprotokoll', sub: manhole.name, actions: [btn('Drucken / PDF', { icon: 'printer', variant: 'primary', small: true, onClick: () => window.print() })] }), main);
+  clear(view, topbar({ back: `#/s/${manhole.id}`, title: 'Schachtprotokoll', sub: manhole.name, actions: window.SB_DEMO ? [] : [btn('Drucken / PDF', { icon: 'printer', variant: 'primary', small: true, onClick: () => window.print() })] }), main);
 
   const ovUrl = insp.overview?.photoId ? await photoUrl(insp.overview.photoId) : null;
   const overview = ovUrl ? await getPhoto(insp.overview.photoId) : null;

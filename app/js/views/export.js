@@ -1,6 +1,6 @@
 // Export: ISYBAU-Zustandsdaten (XML + Fotos als ZIP) und Projekt-Sicherung.
 
-import { h, clear, btn, icon, toast, field, select, toggle, badge } from '../core/ui.js';
+import { h, clear, btn, icon, toast, field, select, toggle, badge, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
 import { getProject, listManholes, getSettings, saveSettings, getPhoto } from '../core/store.js';
 import { exportZustandsdaten, exportFileName } from '../isybau/export.js';
@@ -44,6 +44,7 @@ export async function renderExport(view, projectId) {
     try {
       const out = exportZustandsdaten({ project, items, settings, version: opts.version });
       const base = exportFileName(project, opts.version);
+      if (window.SB_DEMO) { showXml(out, base); return; }
       if (!opts.photos) {
         download([out.bytes], `${base}.xml`, 'application/xml');
       } else {
@@ -69,6 +70,19 @@ export async function renderExport(view, projectId) {
       console.error(e);
       toast('Export fehlgeschlagen: ' + e.message, 'error', 6000);
     }
+  }
+
+  function showXml(out, base) {
+    const ta = h('textarea', { class: 'input mono', rows: 16, readonly: true, style: { fontSize: '.78rem', whiteSpace: 'pre' } }, out.xml);
+    sheet({
+      title: `${base}.xml`, wide: true,
+      body: h('div', { class: 'stack' },
+        h('p', { class: 'muted small' }, `Demo-Version: Dateien können hier nicht heruntergeladen werden. In der installierten App entsteht eine ZIP-Datei mit dieser XML-Datei und ${out.photos.length} Foto(s).`),
+        ta,
+        btn('XML kopieren', { icon: 'file', variant: 'primary', onClick: async () => {
+          try { await navigator.clipboard.writeText(out.xml); toast('XML kopiert.', 'ok'); } catch { ta.select(); toast('Text markiert – bitte manuell kopieren.'); }
+        } })),
+    });
   }
 
   clear(view, topbar({ back: `#/p/${projectId}`, title: 'ISYBAU-Export', sub: project.name }), main);

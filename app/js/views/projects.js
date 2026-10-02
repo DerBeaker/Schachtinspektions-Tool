@@ -30,6 +30,10 @@ export async function renderProjects(view) {
         !projects.length ? btn('Demo ansehen', { icon: 'sparkles', onClick: loadDemo }) : null)),
   );
 
+  if (window.SB_DEMO) {
+    main.append(h('div', { class: 'issue warn', style: { marginTop: '12px' } }, icon('info', 18),
+      h('span', 'Demo-Version: Daten bleiben nur in diesem Browser. Download, Druck, GPS und Team-Server gibt es in der installierten Version.')));
+  }
   if (!projects.length) {
     main.append(h('div', { class: 'card', style: { marginTop: '16px' } },
       empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere ISYBAU-Stammdaten. Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
@@ -104,7 +108,7 @@ export async function importFlow(projectId) {
 
 async function loadDemo() {
   try {
-    const res = await fetch('./demo/demo-stammdaten.xml');
+    const res = await fetch(window.SB_DEMO_XML || './demo/demo-stammdaten.xml');
     const r = await importIntoProject(await res.arrayBuffer(), { fileName: 'Demo Musterweg.xml' });
     r.project.name = 'Demo: Musterweg';
     r.project.ort = 'Beispielstadt';
