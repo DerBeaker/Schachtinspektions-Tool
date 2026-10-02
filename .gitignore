@@ -1,0 +1,8 @@
+.cache/
+node_modules/
+app/api/config.php
+app/api/data/*
+!app/api/data/.htaccess
+app/api/vendor/
+*.log
+.DS_Store

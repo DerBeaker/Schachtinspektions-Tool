@@ -1,0 +1,19 @@
+# Schachtblick API – Schutz interner Dateien (Apache / IONOS)
+Options -Indexes
+# interne Ordner sperren
+<IfModule mod_alias.c>
+  RedirectMatch 403 /(lib|data|vendor)/
+</IfModule>
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(config\.php|config\.sample\.php|composer\.(json|lock))$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+# Authorization-Header an PHP durchreichen (falls Bearer statt X-Auth-Token genutzt wird)
+<IfModule mod_setenvif.c>
+  SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+</IfModule>

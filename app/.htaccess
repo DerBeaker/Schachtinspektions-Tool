@@ -1,0 +1,20 @@
+# Schachtblick – Webserver-Einstellungen (Apache / IONOS)
+AddType application/manifest+json .webmanifest
+AddType text/javascript .js .mjs
+AddDefaultCharset utf-8
+<IfModule mod_headers.c>
+  # Service Worker und Startseite nie zwischenspeichern, damit Updates sofort ankommen
+  <FilesMatch "^(sw\.js|index\.html)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Permissions-Policy "camera=(self), geolocation=(self)"
+</IfModule>
+# HTTPS erzwingen (Kamera, GPS und Offline-Funktion setzen HTTPS voraus)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
