@@ -48,9 +48,12 @@ export const sync = {
   async ping(serverUrl) {
     const url = new URL(this.apiBase(serverUrl));
     url.searchParams.set('r', 'ping');
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Server nicht erreichbar (${res.status}).`);
-    return res.json();
+    let res;
+    try { res = await fetch(url); } catch { throw new Error(`Keine Verbindung zu ${url.origin}${url.pathname}`); }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `Server nicht erreichbar (${res.status})`);
+    if (!data) throw new Error('Die Antwort ist kein JSON – läuft PHP auf dem Webspace?');
+    return data;
   },
 
   async login(serverUrl, username, password) {

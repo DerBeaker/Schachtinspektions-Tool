@@ -71,6 +71,9 @@ export async function renderSettings(view) {
     clear(serverBox,
       h('h3', 'Team-Server (optional)'),
       h('p', { class: 'muted small' }, 'Ohne Server arbeitet die App komplett auf diesem Gerät. Mit Server (PHP + MySQL auf dem eigenen Webspace) werden Projekte, Inspektionen und Fotos zwischen Handy und PC synchronisiert.'),
+      window.SB_DEMO
+        ? h('div', { class: 'issue warn' }, icon('info', 18), h('span', 'In dieser Demo-Vorschau gibt es keinen Server – Anmeldung und Betreiber-Bereich funktionieren erst in der installierten Version auf dem eigenen Webspace.'))
+        : h('p', { class: 'muted small' }, 'Der Betreiber-Bereich (Firmen und Lizenzen verwalten) erscheint hier nach der Anmeldung mit dem Konto, das bei der Einrichtung (…/api/setup.php) angelegt wurde.'),
       field('Server-Adresse', input(d.url, (v) => { d.url = v; }, { placeholder: 'leer = gleicher Webspace (…/api/)', inputmode: 'url', autocapitalize: 'off' })),
       h('div', { class: 'grid2' },
         field('E-Mail oder Benutzer', input('', (v) => { d.user = v; }, { autocomplete: 'username', autocapitalize: 'off', inputmode: 'email' })),
@@ -85,7 +88,11 @@ export async function renderSettings(view) {
           } catch (e) { toast('Anmeldung fehlgeschlagen: ' + e.message, 'error', 6000); }
         } }),
         btn('Verbindung testen', { variant: 'ghost', onClick: async () => {
-          try { const r = await sync.ping(d.url.trim()); toast(`Server erreichbar (v${r.version}${r.ai ? ', KI aktiv' : ''}).`, 'ok'); } catch (e) { toast(e.message, 'error'); }
+          try {
+            const r = await sync.ping(d.url.trim());
+            if (r.installed === false) toast('Server erreichbar, aber noch nicht eingerichtet – bitte zuerst …/api/setup.php im Browser öffnen.', 'info', 7000);
+            else toast(`Server erreichbar und eingerichtet (v${r.version}${r.ai ? ', KI aktiv' : ''}).`, 'ok');
+          } catch (e) { toast(`${e.message} – ist der Ordner api/ hochgeladen und api/config.php angelegt?`, 'error', 7000); }
         } }),
         btn('Passwort vergessen?', { variant: 'ghost', onClick: () => passwortVergessen(d.url.trim(), d.user.trim()) })));
   }
