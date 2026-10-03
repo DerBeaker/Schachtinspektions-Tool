@@ -68,6 +68,22 @@ export const REF = {
     ['KKIW', 'Kanalklinker Wandung'], ['ZMR', 'Zementmörtel gesamter Innenraum'], ['ZMS', 'Zementmörtel Sohle'],
     ['ZMW', 'Zementmörtel Wandung'], ['AIKHR', 'Kunstharz gesamter Innenraum'],
   ],
+  G107: [ // Abwasserart (nur bewertungsrelevante Auswahl)
+    ['0', 'häuslich'], ['1', 'gewerblich'], ['2', 'industriell'], ['3', 'Abwasser mit wassergefährdenden Stoffen'],
+    ['4', 'Dränagewasser'], ['5', 'Regenwasser'], ['6', 'thermisch belastet'],
+  ],
+  G109: [ // Grundwasserabstand
+    ['0', 'Gerinne oberhalb des Grundwasserleiters'], ['1', 'Gerinne in der Wechselzone'],
+    ['2', 'Gerinne im Grundwasserleiter'], ['3', 'Sonstige'],
+  ],
+  G110: [ // Wasserschutzzone
+    ['0', 'außerhalb einer Wasserschutzzone'], ['1', 'Schutzzone IIIb'], ['2', 'Schutzzone IIIa'],
+    ['3', 'Schutzzone II'], ['6', 'Schutzzone I'], ['4', 'Trinkwasserschutzgebiet'],
+    ['5', 'Thermal-/Heilquellenschutzgebiet'], ['7', 'Sonstige'],
+  ],
+  G111: [ // anstehende Bodenart
+    ['0', 'Sand, Kies'], ['1', 'Feinsand, lehmiger Sand'], ['2', 'sandiger Lehm, Löss'], ['3', 'Lehm, Ton'], ['4', 'Sonstige'],
+  ],
   G301: [ // Schachtfunktion (Auswahl)
     ['1', 'Schacht'], ['2', 'Sonderschacht'], ['3', 'Kontrollschacht'], ['4', 'Drosselschacht'],
     ['7', 'Hausrevisionsschacht'], ['10', 'Inspektionsöffnung'], ['13', 'Drainageschacht'],

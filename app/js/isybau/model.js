@@ -163,6 +163,7 @@ export function buildRecords(insp, { photoName = () => null, version = '2017-07'
       Kommentar: f.kommentar || null,
       DDEZulaufDrainage: f.code === 'DDE' && f.drainage ? '1' : null,
       _erfassung: f.source === 'ai' ? '3' : '1',
+      _fid: f.id, // Zuordnung Datensatz -> Befund (z. B. für die Zustandsklassen)
     };
     if (f.strecke && f.lageEndValue !== '' && f.lageEndValue != null) {
       const v2 = verticalPosition(insp, f.lageMode, f.lageEndValue);

@@ -6,6 +6,7 @@
 import { parseXml, decodeXmlBytes, child, children, text, num, findAll } from './xml.js';
 import { bearing, bearingToClock } from '../lib/geo.js';
 import { parseM150, isM150Root } from './m150.js';
+import { parseIsybauZustand, parseM150Zustand } from './vorinspektion.js';
 
 const r3 = (v) => (v == null ? null : Math.round(v * 1000) / 1000);
 const r2 = (v) => (v == null ? null : Math.round(v * 100) / 100);
@@ -160,6 +161,7 @@ export function assembleManholes(nodes, edges, warnings = []) {
       schacht: n.schacht,
       deckel: n.deckel,
       extra: n.extra || null,
+      umwelt: n.umwelt || null,
       pipes,
     });
   }
@@ -172,6 +174,33 @@ export function assembleManholes(nodes, edges, warnings = []) {
   if (ohneAblauf) warnings.push(`${ohneAblauf} Schächte ohne Ablauf in den Stammdaten – dort bitte den Auslauf (12 Uhr) am Foto festlegen.`);
   if (deckelBerechnet) warnings.push(`Deckelhöhe bei ${deckelBerechnet} Schächten aus Sohlhöhe + Schachttiefe berechnet.`);
   return manholes;
+}
+
+/** XML einlesen (oder bereits geparste Wurzel durchreichen). */
+export function readRoot(input) {
+  if (input && typeof input === 'object' && Array.isArray(input.children) && input.name) return input;
+  return parseXml(typeof input === 'string' ? input : decodeXmlBytes(input));
+}
+
+/**
+ * Beliebige Austauschdatei einlesen: Stammdaten und/oder vorhandene Schachtinspektionen.
+ * @returns {{stamm: object|null, zustand: {version, vorinspektionen}|null, format}}
+ */
+export function importDatei(input) {
+  const root = readRoot(input);
+  if (isM150Root(root)) {
+    const hasStamm = children(root, 'KG').length || children(root, 'HG').length;
+    const hasKI = children(root, 'KG').some((kg) => children(kg, 'KI').length);
+    return { format: 'm150', stamm: hasStamm ? importM150(root) : null, zustand: hasKI ? parseM150Zustand(root) : null };
+  }
+  if (!root || root.name !== 'Identifikation') {
+    throw new Error('Weder ISYBAU-XML (Wurzelelement „Identifikation“) noch DWA-M 150 (Wurzelelement „DATA“).');
+  }
+  const hasStamm = children(root, 'Datenkollektive/Stammdatenkollektiv').length > 0;
+  const hasZustand = children(root, 'Datenkollektive/Zustandsdatenkollektiv').length > 0;
+  if (!hasStamm && !hasZustand) throw new Error('Die Datei enthält weder Stamm- noch Zustandsdaten.');
+  const zustand = hasZustand ? parseIsybauZustand(root) : null;
+  return { format: 'isybau', stamm: hasStamm ? importStammdaten(root) : null, zustand: zustand?.vorinspektionen.length ? zustand : null };
 }
 
 function importM150(root) {
@@ -198,8 +227,7 @@ function importM150(root) {
  * @returns {{version, crsLage, crsHoehe, liegenschaft, manholes, stats, warnings}}
  */
 export function importStammdaten(input) {
-  const src = typeof input === 'string' ? input : decodeXmlBytes(input);
-  const root = parseXml(src);
+  const root = readRoot(input);
   if (isM150Root(root)) return importM150(root);
   if (!root || root.name !== 'Identifikation') {
     throw new Error('Weder ISYBAU-XML (Wurzelelement „Identifikation“) noch DWA-M 150 (Wurzelelement „DATA“).');
@@ -246,6 +274,12 @@ export function importStammdaten(input) {
         deckelhoehe: dmp?.z ?? null,
         sohlhoehe: smp?.z ?? null,
         crs: geo ? text(geo, 'CRSLage') : '',
+        umwelt: child(a, 'Umweltparameter') ? {
+          abwasserart: text(a, 'Umweltparameter/Abwasserart'),
+          wasserschutzzone: text(a, 'Umweltparameter/Wasserschutzzone'),
+          grundwasser: text(a, 'Umweltparameter/GWabstand'),
+          bodenart: text(a, 'Umweltparameter/Bodenart'),
+        } : null,
         schacht: schacht ? {
           funktion: text(schacht, 'SchachtFunktion'),
           tiefe: num(schacht, 'Schachttiefe'),

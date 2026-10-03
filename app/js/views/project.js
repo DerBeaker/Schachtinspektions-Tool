@@ -9,6 +9,8 @@ import { distance, navUrl } from '../lib/geo.js';
 import { importFlow } from './projects.js';
 import { validateInspection } from '../isybau/validate.js';
 import { EXPORT_FORMATS } from '../isybau/export.js';
+import { bewerteInspektion } from '../isybau/bewertung.js';
+import { klasseBadge } from '../components/klasse.js';
 
 const STATUS = { offen: 'offen', inArbeit: 'in Arbeit', fertig: 'fertig' };
 
@@ -55,13 +57,16 @@ export async function renderProject(view, projectId, params) {
       const st = status(m);
       const insp = m.inspection;
       const v = insp ? validateInspection(insp, { kodiersystem: project.kodiersystem }) : null;
+      const ok = insp && insp.findings.length ? bewerteInspektion(insp, m, project).OK : null;
       return h('div', { class: 'item', role: 'button', tabindex: '0', onclick: () => navigate(`#/s/${m.id}`), onkeydown: (e) => { if (e.key === 'Enter') navigate(`#/s/${m.id}`); } },
         h('span', { class: ['status-dot', st], title: STATUS[st] }),
         h('div', { class: 'grow' },
           h('div', { class: 'row between' },
             h('span', { class: 'mh-name' }, m.name),
             h('span', { class: 'row', style: { gap: '6px' } },
+              ok != null ? klasseBadge(ok, { text: `K${ok}` }) : null,
               insp && insp.findings.length ? badge(`${insp.findings.length} Befunde`, 'info') : null,
+              !insp && m.vorinspektion ? badge(`Vorinspektion ${m.vorinspektion.datum ? m.vorinspektion.datum.slice(0, 4) : ''}`.trim(), '') : null,
               v && v.errors ? badge(`${v.errors} Fehler`, 'err') : null,
               st === 'fertig' && v && !v.errors ? badge('fertig', 'ok') : null)),
           h('div', { class: 'meta' },
@@ -130,7 +135,15 @@ export async function renderProject(view, projectId, params) {
         h('div', { class: 'grid2' },
           field('Liegenschaft Nr.', input(p.liegenschaftNummer, (v) => (p.liegenschaftNummer = v), { maxlength: 20 })),
           field('Liegenschaft Name', input(p.liegenschaftBezeichnung, (v) => (p.liegenschaftBezeichnung = v), { maxlength: 40 }))),
-        h('p', { class: 'muted small' }, 'Liegenschaft ist nur in ISYBAU 2006/2013 Pflicht; leer = Auftragsnummer bzw. Projektname.')),
+        h('p', { class: 'muted small' }, 'Liegenschaft ist nur in ISYBAU 2006/2013 Pflicht; leer = Auftragsnummer bzw. Projektname.'),
+        h('details', null,
+          h('summary', { style: { cursor: 'pointer', fontWeight: 700 } }, 'Randbedingungen für die Zustandsbewertung'),
+          h('div', { class: 'stack', style: { marginTop: '10px' } },
+            h('p', { class: 'muted small' }, 'Gelten für Schächte, zu denen die Stammdaten nichts angeben (BFR Abwasser Tab. A-3 - 4).'),
+            field('Wasserschutzzone', select(p.rb?.wasserschutzzone || '', [['', 'keine Angabe'], ...REF.G110], (v) => { p.rb = { ...p.rb, wasserschutzzone: v }; })),
+            field('Grundwasser', select(p.rb?.grundwasser || '', [['', 'keine Angabe'], ...REF.G109], (v) => { p.rb = { ...p.rb, grundwasser: v }; })),
+            field('Bodenart', select(p.rb?.bodenart || '', [['', 'keine Angabe'], ...REF.G111], (v) => { p.rb = { ...p.rb, bodenart: v }; })),
+            field('Abwasserart', select(p.rb?.abwasserart || '', [['', 'keine Angabe'], ...REF.G107], (v) => { p.rb = { ...p.rb, abwasserart: v }; }))))),
       actions: [btn('Speichern', { variant: 'primary', onClick: async () => {
         // Richtung geändert: vorhandene Inspektionen auf Wunsch mitnehmen (Werte bleiben wie erfasst)
         const other = (p.bezugVertikal || '1') !== (project.bezugVertikal || '1')

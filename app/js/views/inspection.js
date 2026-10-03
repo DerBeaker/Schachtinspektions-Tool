@@ -13,9 +13,11 @@ import { shaftOverview } from '../components/shaft.js';
 import { openFindingEditor, openConnectionEditor, defaultLageMode } from './editors.js';
 import { validateInspection } from '../isybau/validate.js';
 import { bothDepths, connectionsFromStamm } from '../isybau/model.js';
+import { bewerteInspektion, OBJEKTKLASSEN } from '../isybau/bewertung.js';
+import { klasseBadge, befundKlassen, objektklasseBlock } from '../components/klasse.js';
 import { pickPhoto, processPhoto } from '../lib/image.js';
 import { circleFrom3, estimateDepth } from '../lib/depth.js';
-import { debounce, fmtNum, fmtM, clockLabel, uid, num } from '../core/util.js';
+import { debounce, fmtNum, fmtM, fmtDate, clockLabel, uid, num } from '../core/util.js';
 import { navUrl } from '../lib/geo.js';
 import { runAiAnalysis, aiAvailable } from './ai.js';
 
@@ -305,7 +307,11 @@ export async function renderInspection(view, manholeId, params) {
       })) : h('div', { class: 'card' }, empty('target', 'Keine Anschlüsse', 'Im Foto-Reiter auf die Rohröffnungen tippen oder hier manuell anlegen.')),
       h('div', { class: 'row wrap' },
         btn('Anschluss hinzufügen', { icon: 'plus', variant: 'soft', onClick: () => openConnectionEditor({ insp, onSave: (c) => { insp.connections.push(c); changed(); } }) }),
-        fromStamm ? btn('Aus Stammdaten übernehmen', { icon: 'download', onClick: () => { insp.connections.push(...connectionsFromStamm(manhole, uid)); changed(); } }) : null),
+        fromStamm ? btn('Aus Stammdaten übernehmen', { icon: 'download', onClick: () => { insp.connections.push(...connectionsFromStamm(manhole, uid)); changed(); } }) : null,
+        !list.length && manhole.vorinspektion?.connections?.length ? btn('Aus Vorinspektion übernehmen', { icon: 'download', onClick: () => {
+          insp.connections.push(...manhole.vorinspektion.connections.map((c) => ({ ...structuredClone(c), id: uid() })));
+          changed();
+        } }) : null),
       h('p', { class: 'muted small' }, 'Pro Anschluss werden beim Export automatisch die Kodes DCA (Anschluss) und DCG (Anschlussleitung) erzeugt. Lage am Umfang: Draufsicht, tiefster Auslauf = 12 Uhr.')));
   }
 
@@ -319,17 +325,49 @@ export async function renderInspection(view, manholeId, params) {
 
   function editFinding(f) {
     openFindingEditor({
-      insp, project, finding: f,
+      insp, project, manhole, finding: f,
       onSave: (nf) => { Object.assign(f, nf); changed(); },
       onDelete: () => { insp.findings = insp.findings.filter((x) => x.id !== f.id); changed(); },
     });
   }
   function addFinding(code) {
-    openFindingEditor({ insp, project, presetCode: code, onSave: (nf) => { insp.findings.push(nf); changed(); } });
+    openFindingEditor({ insp, project, manhole, presetCode: code, onSave: (nf) => { insp.findings.push(nf); changed(); } });
+  }
+
+  function vorinspektionPanel() {
+    const vi = manhole.vorinspektion;
+    if (!vi || !(vi.findings?.length || vi.connections?.length)) return null;
+    const taken = new Set(insp.findings.map((f) => f.fromVorId).filter(Boolean));
+    const take = (vf) => insp.findings.push({ ...structuredClone(vf), id: uid(), fromVorId: vf.id, source: 'vorinspektion', photoId: null });
+    const rest = vi.findings.filter((vf) => !taken.has(vf.id));
+    const vb = bewerteInspektion({ ...vi, tiefe: vi.tiefe ?? insp.tiefe }, manhole, project);
+    return h('details', { class: 'card card-pad stack-sm', open: !insp.findings.length },
+      h('summary', { style: { cursor: 'pointer', fontWeight: 700 } },
+        `Vorinspektion ${vi.datum ? 'vom ' + fmtDate(vi.datum) : ''} · ${vi.findings.length} Befunde `,
+        klasseBadge(vb.OK)),
+      h('div', { class: 'muted small' }, [vi.quelle, vi.inspekteur].filter(Boolean).join(' · ') + '. Unveränderte Befunde übernehmen, Änderungen danach im Befund anpassen.'),
+      h('div', { class: 'list' }, vi.findings.map((vf) => {
+        const d = bothDepths({ ...insp, bezugVertikal: vi.bezugVertikal }, vf.lageMode, vf.lageValue);
+        return h('div', { class: 'item', style: { cursor: 'default' } },
+          h('div', { class: 'grow' },
+            h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, h('span', { class: 'code-chip' }, fullCode(vf)),
+              befundKlassen(vb.befunde.find((e) => e.id === vf.id)?.klassen)),
+            h('div', { class: 'small', style: { marginTop: '2px' } }, CODES[vf.code] ? codeLabel(vf) : vf.code),
+            h('div', { class: 'meta' },
+              d.oben != null ? h('span', `${fmtNum(d.oben)} m ab Deckel`) : vf.lageValue !== '' ? h('span', `${fmtNum(vf.lageValue)} m ${vf.lageMode === 'oben' ? 'ab Deckel' : 'ü. Sohle'}`) : null,
+              vf.clockFrom ? h('span', clockLabel(vf.clockFrom, vf.clockTo)) : null,
+              vf.bereich ? h('span', `Bereich ${vf.bereich}`) : null,
+              vf.kommentar ? h('span', vf.kommentar) : null)),
+          taken.has(vf.id) ? badge('übernommen', 'ok')
+            : btn('Übernehmen', { small: true, variant: 'soft', onClick: () => { take(vf); changed(); toast('Befund übernommen – bitte vor Ort prüfen.', 'ok'); } }));
+      })),
+      rest.length > 1 ? btn(`Alle ${rest.length} übernehmen`, { icon: 'download', onClick: () => { rest.forEach(take); changed(); toast(`${rest.length} Befunde übernommen.`, 'ok'); } }) : null);
   }
 
   async function renderFindings(v) {
     const items = findingItems().sort((a, b) => (a.depthFromTop ?? 99) - (b.depthFromTop ?? 99));
+    const bew = bewerteInspektion(insp, manhole, project);
+    const klById = new Map(bew.befunde.map((e) => [e.id, e]));
     const listEl = h('div', { class: 'list' });
     for (const it of items) {
       const f = it.f;
@@ -344,7 +382,9 @@ export async function renderInspection(view, manholeId, params) {
         h('div', { class: 'grow' },
           h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
             h('span', { class: 'code-chip' }, fullCode(f)),
+            befundKlassen(klById.get(f.id)?.klassen),
             f.source === 'ai' ? badge('KI-Vorschlag', 'ai') : null,
+            f.source === 'vorinspektion' ? badge('aus Vorinspektion', 'info') : null,
             errs ? badge(`${errs} Fehler`, 'err') : iss.length ? badge('Hinweis', 'warn') : null),
           h('div', { style: { fontWeight: 600, marginTop: '4px' } }, codeLabel(f)),
           h('div', { class: 'meta' },
@@ -364,6 +404,12 @@ export async function renderInspection(view, manholeId, params) {
         h('div', { class: 'row between' }, h('h3', 'Schachtschnitt'), h('span', { class: 'muted small' }, `${items.length} Befunde`)),
         shaftOverview(items, { tiefe: insp.tiefe, onSelect: (it) => editFinding(it.f) })),
       h('div', { class: 'stack' },
+        items.length ? h('div', { class: 'card card-pad stack-sm' },
+          objektklasseBlock(bew),
+          h('div', { class: 'muted small' }, `Zustandsbewertung nach BFR Abwasser A-3: Objektzahl ${bew.OZe}${bew.OZv ? ` (größter Einzelschaden ${bew.massgebend?.code}: ${bew.OZv}, Schadensdichte +${bew.SL})` : ''}.`
+            + (bew.pauschal ? ' * = pauschale Einordnung, vom Fachingenieur zu prüfen.' : '')),
+          bew.offen.length ? h('div', { class: 'issue warn' }, icon('info', 18), h('span', bew.offen.join(' · '))) : null) : null,
+        vorinspektionPanel(),
         h('div', null, h('div', { class: 'section-title', style: { marginTop: 0 } }, 'Schnell erfassen'), favs),
         items.length ? listEl : h('div', { class: 'card' }, empty('list', 'Noch keine Befunde', 'Mängelfreier Schacht? Dann einfach abschließen – Anfang/Ende (DDB) und Anschlüsse werden automatisch exportiert.')))));
     clear(fab, h('button', { class: 'fab', onclick: () => addFinding(), 'aria-label': 'Befund hinzufügen', style: { bottom: 'calc(86px + env(safe-area-inset-bottom))' } }, icon('plus', 24), h('span', 'Befund')));
@@ -418,7 +464,28 @@ export async function renderInspection(view, manholeId, params) {
             h('dt', 'Baujahr'), h('dd', manhole.baujahr || '–'),
             h('dt', 'Koordinaten'), h('dd', { class: 'mono small' }, manhole.x ? `${fmtNum(manhole.x, 2)} / ${fmtNum(manhole.y, 2)}` : '–'))
             : h('p', { class: 'muted small' }, 'Manuell angelegter Schacht (keine Stammdaten).'),
-          !stamm ? field('Straße', input(manhole.strasse, async (val) => { manhole.strasse = val; await saveManhole(manhole); })) : null))));
+          !stamm ? field('Straße', input(manhole.strasse, async (val) => { manhole.strasse = val; await saveManhole(manhole); })) : null),
+        bewertungCard())));
+  }
+
+  function bewertungCard() {
+    const b = bewerteInspektion(insp, manhole, project);
+    const rb = b.rb;
+    const lbl = (list, v) => (v === '' || v == null ? 'keine Angabe' : refLabel(list, v));
+    const quelle = (k) => (manhole.umwelt?.[k] !== undefined && manhole.umwelt?.[k] !== '' ? 'Stammdaten' : project.rb?.[k] ? 'Projekt' : '');
+    return h('div', { class: 'card card-pad stack-sm' },
+      h('h3', 'Zustandsbewertung (BFR Abwasser)'),
+      objektklasseBlock(b),
+      h('dl', { class: 'kv' },
+        h('dt', 'Größter Einzelschaden'), h('dd', b.massgebend ? `${b.massgebend.code} (Schadenszahl ${b.OZv})` : 'keiner'),
+        h('dt', 'Schadensdichte'), h('dd', `+${b.SL} Punkte`),
+        h('dt', 'Objektzahl'), h('dd', String(b.OZe)),
+        h('dt', 'Abwasser'), h('dd', rb.entwaesserungsart ? refLabel('G101', rb.entwaesserungsart) : 'keine Angabe'),
+        h('dt', 'Wasserschutzzone'), h('dd', `${lbl('G110', rb.wasserschutzzone)} ${quelle('wasserschutzzone') ? '(' + quelle('wasserschutzzone') + ')' : ''}`),
+        h('dt', 'Grundwasser'), h('dd', `${lbl('G109', rb.grundwasser)} ${quelle('grundwasser') ? '(' + quelle('grundwasser') + ')' : ''}`),
+        h('dt', 'Bodenart'), h('dd', `${lbl('G111', rb.bodenart)} ${quelle('bodenart') ? '(' + quelle('bodenart') + ')' : ''}`)),
+      b.offen.length ? h('div', { class: 'issue warn' }, icon('info', 18), h('span', b.offen.join(' · '))) : null,
+      h('p', { class: 'muted small' }, 'Automatische Bewertung nach BFR Abwasser Anhang A-3 (Stand 01/2025). Pauschale Einordnungen (*) und die Objektklasse sind vom Fachingenieur zu prüfen. Randbedingungen kommen aus den Stammdaten oder aus „Projekt & Auftrag“.'));
   }
 
   // ------------------------------------------------------------------ Menü

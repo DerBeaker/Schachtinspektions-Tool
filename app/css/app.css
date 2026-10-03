@@ -347,3 +347,10 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
   .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 }
 @media (max-width: 420px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+
+/* Zustandsklassen (BFR Abwasser A-3) */
+.kl { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 26px; padding: 2px 8px; border-radius: 999px; font-size: .74rem; font-weight: 800; color: #fff; white-space: nowrap; }
+.kl-0 { background: #2b8a3e; } .kl-1 { background: #74b816; } .kl-2 { background: #f2c200; color: #2b2400; }
+.kl-3 { background: #f08c00; } .kl-4 { background: #e03131; } .kl-5 { background: #862e2e; }
+.kl-big { min-width: 44px; height: 44px; font-size: 1.3rem; border-radius: 12px; }
+.kl-row { display: inline-flex; gap: 4px; flex-wrap: wrap; }

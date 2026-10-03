@@ -97,7 +97,8 @@ export async function importFlow(projectId) {
   try {
     const buf = await readFile(file);
     const r = await importIntoProject(buf, { projectId, fileName: file.name });
-    toast(`${r.added} Schächte importiert${r.updated ? `, ${r.updated} aktualisiert` : ''} (${r.format === 'm150' ? r.version : `ISYBAU ${r.version || '?'}`}).`, 'ok', 4500);
+    const parts = [`${r.added} Schächte neu`, r.updated ? `${r.updated} aktualisiert` : null, r.vorinspektionen ? `${r.vorinspektionen} Vorinspektionen` : null].filter(Boolean);
+    toast(`${parts.join(', ')} (${r.format === 'm150' ? r.version : `ISYBAU ${r.version || '?'}`}).`, 'ok', 4500);
     for (const w of r.warnings) toast(w, 'info', 5000);
     if (projectId) window.dispatchEvent(new Event('app:route'));
     else navigate(`#/p/${r.project.id}`);

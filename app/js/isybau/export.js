@@ -2,6 +2,7 @@
 
 import { XmlWriter, esc, encodeLatin1 } from './xml.js';
 import { buildRecords, KZUSTAND_ORDER } from './model.js';
+import { bewerteInspektion, ZIELE } from './bewertung.js';
 
 export const APP_NAME = 'Schachtblick';
 export const APP_VERSION = '0.3.0';
@@ -72,7 +73,38 @@ export function photoNamer(objekt) {
  * @param {string} p.version   '2006-10' | '2013-02' | '2017-07' | '2024-06'
  * @returns {{xml:string, bytes:Uint8Array, photos:Array<{id,file}>, count:number}}
  */
-export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date() }) {
+/** Klassifizierung eines Befundes als KZustand/Klassifizierung (vgl. BFR Anh. A-3.1.4). */
+function klassifizierungXml(e) {
+  if (!e || e.MaxSZe == null) return null;
+  const name = { D: 'Dichtheit', S: 'Standsicherheit', B: 'Betriebssicherheit' };
+  return [
+    ...ZIELE.filter((z) => e.klassen[z]).map((z) => [name[z], [
+      [`SK${z}vAuto`, String(e.klassen[z].k)],
+      [`SZ${z}vAuto`, String(e.SZv[z])],
+      [`SZ${z}eAuto`, String(e.SZe[z])],
+      [`SK${z}eAuto`, String(e.SKe[z])],
+    ]]),
+    ['MaxSZeAuto', String(e.MaxSZe)],
+    ['MaxSKeAuto', String(e.MaxSKe)],
+  ];
+}
+
+/** Objektbewertung des Schachts (Knoten/Bewertung). */
+function bewertungXml(b, today) {
+  const q = b.massgebend?.q1;
+  return [
+    ['Bewertungsverfahren', '1'],
+    ['Bewertungsdatum', today.toISOString().slice(0, 10)],
+    ['MassgebenderSchaden', b.massgebend?.code || null],
+    ['MassgebendeQuantifizierung', q === '' || q == null || !Number.isFinite(Number(q)) ? null : Number(q).toFixed(2)],
+    ['ZahlVorlaeufig', b.OZv ? String(b.OZv) : null],
+    ['Zusatzpunkte', b.OZv ? String(b.SL) : null],
+    ['ZahlEndgueltig', String(b.OZe)],
+    ['KlasseAutomatisch', String(b.OK)],
+  ];
+}
+
+export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date(), bewertung = true }) {
   const profile = ISYBAU_VERSIONS[version];
   if (!profile) throw new Error(`Unbekannte ISYBAU-Version ${version}`);
   const isoDate = (d) => d.toISOString().slice(0, 10);
@@ -86,6 +118,13 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
   const anlagen = items.map(({ inspection: insp, manhole }) => {
     const namer = photoNamer(manhole.name);
     const records = buildRecords(insp, { photoName: namer.name, version });
+    const bew = bewertung ? bewerteInspektion(insp, manhole, project) : null;
+    if (bew) {
+      const byId = new Map(bew.befunde.map((e) => [e.id, e]));
+      for (const r of records) {
+        if (r._fid && r.Streckenschaden !== 'B') r.Klassifizierung = klassifizierungXml(byId.get(r._fid));
+      }
+    }
     photos.push(...namer.entries());
     const lage = [
       ['Strassenschluessel', /^\d{1,5}$/.test(manhole.strassenschluessel || '') ? manhole.strassenschluessel : null],
@@ -119,6 +158,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
             ['ArtAuskleidung', insp.artAuskleidung || null],
           ]],
           ['Inspektionsdaten', records.map((r) => ['KZustand', ordered(r, order)])],
+          bew ? ['Bewertung', bewertungXml(bew, today)] : null,
         ]],
       ]],
     ]];

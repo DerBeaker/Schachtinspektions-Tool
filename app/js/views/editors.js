@@ -7,6 +7,8 @@ import { clockPicker } from '../components/clockpicker.js';
 import { shaftPicker, suggestBereich } from '../components/shaft.js';
 import { validateFinding } from '../isybau/validate.js';
 import { bothDepths } from '../isybau/model.js';
+import { klassifiziereBefund } from '../isybau/bewertung.js';
+import { befundKlassen } from '../components/klasse.js';
 import { uid, fmtNum } from '../core/util.js';
 import { addPhoto, photoUrl, deletePhoto } from '../core/store.js';
 import { pickPhoto, processPhoto } from '../lib/image.js';
@@ -76,7 +78,7 @@ export function codePicker(onPick, { exclude = ['DCA', 'DCG'] } = {}) {
 }
 
 // ---- Befund-Editor ---------------------------------------------------------
-export function openFindingEditor({ insp, project, finding, onSave, onDelete, presetCode }) {
+export function openFindingEditor({ insp, project, manhole, finding, onSave, onDelete, presetCode }) {
   const isNew = !finding;
   let f = finding ? structuredClone(finding) : null;
   const s = sheet({ title: isNew ? 'Neuer Befund' : 'Befund bearbeiten', body: h('div'), wide: true });
@@ -98,10 +100,18 @@ export function openFindingEditor({ insp, project, finding, onSave, onDelete, pr
     const c2Box = h('div');
     const qBox = h('div');
     const issues = h('div');
+    const klassenEl = h('div');
     const photoBox = h('div');
     const streckeBox = h('div');
 
-    const refresh = () => clear(issues, issuesBox(validateFinding(f, insp, { kodiersystem: project.kodiersystem })));
+    const refresh = () => {
+      clear(issues, issuesBox(validateFinding(f, insp, { kodiersystem: project.kodiersystem })));
+      const kl = klassifiziereBefund(f, { werkstoff: manhole?.schacht?.material });
+      clear(klassenEl, kl.klassifizierbar ? h('div', { class: 'row wrap', style: { gap: '8px' } },
+        h('span', { class: 'muted small' }, 'Zustandsklassen (BFR):'),
+        befundKlassen(kl, { leer: h('span', { class: 'muted small' }, kl.fehlt || 'keine Einordnung') }),
+        kl.fehlt && befundKlassen(kl) ? h('span', { class: 'muted small' }, `(${kl.fehlt})`) : null) : null);
+    };
     const renderC2 = () => {
       const opts = c2Options(f.code, f.c1);
       if (f.c2 && !opts.some((o) => o.k === f.c2)) f.c2 = '';
@@ -178,7 +188,7 @@ export function openFindingEditor({ insp, project, finding, onSave, onDelete, pr
       f.source === 'ai' ? h('div', { class: 'issue', style: { background: 'var(--surface-2)' } }, icon('sparkles', 18),
         h('span', `Vorschlag des KI-Assistenten${f.aiConfidence ? ` (Sicherheit ${Math.round(f.aiConfidence * 100)} %)` : ''} – bitte prüfen.${f.aiReason ? ' Begründung: ' + f.aiReason : ''}`)) : null,
       h('div', { class: 'section-title' }, 'Prüfung'),
-      issues);
+      issues, klassenEl);
 
     renderC2(); renderQ(); renderStrecke(); renderPhoto(); refresh();
     s.setBody(body);

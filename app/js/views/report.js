@@ -4,6 +4,7 @@ import { h, clear, btn } from '../core/ui.js';
 import { topbar } from '../core/shell.js';
 import { getInspection, getManhole, getProject, getSettings, photoUrl, getPhoto } from '../core/store.js';
 import { buildRecords } from '../isybau/model.js';
+import { bewerteInspektion, klassenKurz, OBJEKTKLASSEN } from '../isybau/bewertung.js';
 import { codeLabel, CODES } from '../data/codes.js';
 import { refLabel } from '../data/reflists.js';
 import { fmtDate, fmtM, fmtNum } from '../core/util.js';
@@ -16,6 +17,8 @@ export async function renderReport(view, inspectionId) {
   const settings = await getSettings();
   const names = new Map();
   const recs = buildRecords(insp, { photoName: (id) => { if (!names.has(id)) names.set(id, `Foto ${names.size + 1}`); return names.get(id); } });
+  const bew = bewerteInspektion(insp, manhole, project);
+  const klById = new Map(bew.befunde.map((e) => [e.id, e.klassen]));
 
   const main = h('main', { class: 'main' });
   clear(view, topbar({ back: `#/s/${manhole.id}`, title: 'Schachtprotokoll', sub: manhole.name, actions: window.SB_DEMO ? [] : [btn('Drucken / PDF', { icon: 'printer', variant: 'primary', small: true, onClick: () => window.print() })] }), main);
@@ -51,7 +54,7 @@ export async function renderReport(view, inspectionId) {
             h('td', dep != null && dep !== '' ? `${fmtNum(dep)} m` : '–'), h('td', c.pipeName || c.kommentar || ''));
         })))),
     h('section', null, h('h3', { style: { margin: '14px 0 6px' } }, 'Zustandsdaten (ISYBAU-Datensätze)'),
-      h('table', null, h('thead', null, h('tr', null, h('th', 'Nr.'), h('th', insp.bezugVertikal === '2' ? 'Lage ab Deckel [m]' : 'Lage ab Sohle [m]'), h('th', 'Kode'), h('th', 'Beschreibung'), h('th', 'Quant.'), h('th', 'Uhr'), h('th', 'Ber.'), h('th', 'Anmerkung / Foto'))),
+      h('table', null, h('thead', null, h('tr', null, h('th', 'Nr.'), h('th', insp.bezugVertikal === '2' ? 'Lage ab Deckel [m]' : 'Lage ab Sohle [m]'), h('th', 'Kode'), h('th', 'Beschreibung'), h('th', 'Quant.'), h('th', 'Uhr'), h('th', 'Ber.'), h('th', 'Klassen'), h('th', 'Anmerkung / Foto'))),
         h('tbody', null, recs.map((r) => h('tr', null,
           h('td', r.Index), h('td', r.VertikaleLage.replace('.', ',')),
           h('td', { class: 'mono' }, `${r.InspektionsKode}${r.Charakterisierung1 || ''}${r.Charakterisierung2 || ''}${r.Streckenschaden ? ' ' + r.Streckenschaden + (r.StreckenschadenLfdNr || '') : ''}`),
@@ -59,7 +62,10 @@ export async function renderReport(view, inspectionId) {
           h('td', [r.Quantifizierung1Numerisch, r.Quantifizierung2Numerisch].filter(Boolean).map((x) => x.replace('.', ',')).join(' / ')),
           h('td', r.PositionVon ? (r.PositionBis && r.PositionBis !== '00' ? `${+r.PositionVon}–${+r.PositionBis}` : +r.PositionVon) : ''),
           h('td', r.Schachtbereich || ''),
+          h('td', r._fid && r.Streckenschaden !== 'B' ? klassenKurz(klById.get(r._fid)) : ''),
           h('td', [r.Kommentar, r.Fotodatei].filter(Boolean).join(' · '))))))),
+    h('p', { style: { marginTop: '8px' } }, h('b', `Objektklasse ${bew.OK}: `), OBJEKTKLASSEN[bew.OK],
+      h('span', { class: 'small', style: { color: '#667' } }, ` (Zustandsbewertung nach BFR Abwasser A-3, Objektzahl ${bew.OZe}${bew.pauschal ? '; * pauschale Einordnung, fachlich zu prüfen' : ''})`)),
     photoFigs.length ? h('section', null, h('h3', { style: { margin: '14px 0 6px' } }, 'Fotos'), h('div', { class: 'photos' }, photoFigs)) : null,
     insp.bemerkung ? h('p', { style: { marginTop: '12px' } }, h('b', 'Bemerkung: '), insp.bemerkung) : null,
     h('p', { class: 'small', style: { marginTop: '18px', color: '#667' } }, `Erstellt mit Schachtblick am ${new Date().toLocaleDateString('de-DE')}. Vertikale Lage bezogen auf: ${refLabel('U115', insp.bezugVertikal)}.`)));

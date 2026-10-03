@@ -2,7 +2,7 @@
 
 import { db } from './db.js';
 import { uid } from './util.js';
-import { importStammdaten } from '../isybau/import.js';
+import { importDatei } from '../isybau/import.js';
 import { newInspection, connectionsFromStamm } from '../isybau/model.js';
 import { toWgs84 } from '../lib/geo.js';
 
@@ -94,40 +94,62 @@ export async function deleteProject(id) {
   emit('project', null);
 }
 
-/** Importiert ISYBAU-Stammdaten in ein (neues oder bestehendes) Projekt. */
+/**
+ * Importiert eine Austauschdatei (ISYBAU 2006–2024 oder DWA-M 150) in ein neues oder
+ * bestehendes Projekt: Stammdaten -> Schächte, vorhandene Inspektionen -> Vorinspektion je Schacht.
+ */
 export async function importIntoProject(buffer, { projectId, fileName } = {}) {
-  const data = importStammdaten(buffer);
+  const { stamm, zustand, format } = importDatei(buffer);
+  const vors = zustand?.vorinspektionen || [];
+  const version = stamm?.version || zustand?.version || '';
+  const warnings = [...(stamm?.warnings || [])];
   let project = projectId ? await getProject(projectId) : null;
   if (!project) {
     project = await createProject({
-      name: data.liegenschaft || (fileName || 'Stammdaten-Import').replace(/\.xml$/i, ''),
-      ort: data.manholes[0]?.ortsteil || '',
-      crsLage: data.crsLage, crsHoehe: data.crsHoehe, stammdatenDatei: fileName || '',
+      name: stamm?.liegenschaft || (fileName || 'Import').replace(/\.xml$/i, ''),
+      ort: stamm?.manholes[0]?.ortsteil || vors[0]?.ortsteil || '',
+      crsLage: stamm?.crsLage || '', crsHoehe: stamm?.crsHoehe || '', stammdatenDatei: fileName || '',
     });
-    // Abgabe standardmäßig im Format der gelieferten Stammdaten
-    if (data.format === 'm150') project.exportFormat = 'm150';
-    else if (['2006-10', '2013-02', '2017-07', '2024-06'].includes(data.version)) project.exportFormat = data.version;
-  } else {
-    project.crsLage = data.crsLage || project.crsLage;
-    project.crsHoehe = data.crsHoehe || project.crsHoehe;
+    // Abgabe standardmäßig im Format der gelieferten Datei
+    if (format === 'm150') project.exportFormat = 'm150';
+    else if (['2006-10', '2013-02', '2017-07', '2024-06'].includes(version)) project.exportFormat = version;
+  } else if (stamm) {
+    project.crsLage = stamm.crsLage || project.crsLage;
+    project.crsHoehe = stamm.crsHoehe || project.crsHoehe;
     project.stammdatenDatei = fileName || project.stammdatenDatei;
   }
-  if (data.liegenschaftDaten) {
-    project.liegenschaftNummer ||= data.liegenschaftDaten.nummer;
-    project.liegenschaftBezeichnung ||= data.liegenschaftDaten.bezeichnung;
+  if (stamm?.liegenschaftDaten) {
+    project.liegenschaftNummer ||= stamm.liegenschaftDaten.nummer;
+    project.liegenschaftBezeichnung ||= stamm.liegenschaftDaten.bezeichnung;
   }
   const existing = await db.byIndex('manholes', 'projectId', project.id);
   const byName = new Map(existing.filter((m) => !m.deleted).map((m) => [m.name, m]));
   let added = 0, updated = 0;
-  const recs = data.manholes.map((m) => {
+  for (const m of stamm?.manholes || []) {
     const old = byName.get(m.name);
     if (old) updated++; else added++;
-    const wgs = m.x != null ? toWgs84(m.x, m.y, m.crs || data.crsLage) : null;
-    return touch({ ...(old || {}), ...m, id: old?.id || uid(), projectId: project.id, source: data.format || 'isybau', wgs, createdAt: old?.createdAt || Date.now() });
-  });
-  await db.putMany('manholes', recs);
+    const wgs = m.x != null ? toWgs84(m.x, m.y, m.crs || stamm.crsLage) : null;
+    byName.set(m.name, { ...(old || {}), ...m, id: old?.id || uid(), projectId: project.id, source: format || 'isybau', wgs, createdAt: old?.createdAt || Date.now() });
+  }
+  // Vorinspektionen: je Schacht die jüngste behalten; unbekannte Schächte anlegen
+  let vorCount = 0;
+  for (const v of vors.sort((a, b) => String(a.datum).localeCompare(String(b.datum)))) {
+    if (!v.objekt) continue;
+    let m = byName.get(v.objekt);
+    if (!m) {
+      m = { id: uid(), projectId: project.id, name: v.objekt, strasse: v.strasse || '', ortsteil: v.ortsteil || '', tiefe: v.tiefe ?? null, pipes: [], source: 'vorinspektion', createdAt: Date.now() };
+      added++;
+    }
+    const { objekt, strasse, ortsteil, ...vi } = v;
+    m = { ...m, vorinspektion: { ...vi, importiert: Date.now(), datei: fileName || '' } };
+    if (m.tiefe == null && v.tiefe != null) m.tiefe = v.tiefe;
+    byName.set(v.objekt, m);
+    vorCount++;
+  }
+  const touched = new Set([...(stamm?.manholes || []).map((m) => m.name), ...vors.map((v) => v.objekt)]);
+  await db.putMany('manholes', [...byName.values()].filter((m) => touched.has(m.name)).map(touch));
   await saveProject(project);
-  return { project, added, updated, warnings: data.warnings, version: data.version, format: data.format };
+  return { project, added, updated, vorinspektionen: vorCount, warnings, version, format };
 }
 
 // ---- Schächte --------------------------------------------------------------
@@ -170,6 +192,10 @@ export async function openOrCreateInspection(manholeId) {
   const settings = await getSettings();
   const insp = newInspection({ id: uid(), project, manhole, inspector: settings.inspector });
   insp.connections = connectionsFromStamm(manhole, uid);
+  // ohne Stammdaten-Leitungen: Anschlüsse (Lage, DN) aus der Vorinspektion vorbelegen
+  if (!insp.connections.length && manhole.vorinspektion?.connections?.length) {
+    insp.connections = manhole.vorinspektion.connections.map((c) => ({ ...structuredClone(c), id: uid() }));
+  }
   insp.createdAt = Date.now();
   await saveInspection(insp);
   return insp;
