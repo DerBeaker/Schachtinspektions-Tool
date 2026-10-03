@@ -1,17 +1,18 @@
 // Service Worker: macht die App offline-fähig (App-Dateien im Cache, API nie cachen).
-const VERSION = 'schachtblick-v3';
+const VERSION = 'schachtblick-v4';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
-  './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
+  './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png', './icons/mmse-logo.png',
   './demo/demo-stammdaten.xml',
-  './js/main.js', './js/sync.js',
+  './js/main.js', './js/sync.js', './js/brand.js',
   './js/core/db.js', './js/core/shell.js', './js/core/store.js', './js/core/ui.js', './js/core/util.js',
   './js/data/codes.js', './js/data/reflists.js',
-  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js', './js/isybau/m150.js', './js/isybau/bewertung.js', './js/isybau/vorinspektion.js', './js/data/bfr-klassen.js', './js/components/klasse.js',
-  './js/lib/geo.js', './js/lib/zip.js', './js/lib/image.js', './js/lib/depth.js',
+  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js', './js/isybau/m150.js', './js/isybau/bewertung.js', './js/isybau/vorinspektion.js', './js/data/bfr-klassen.js', './js/components/klasse.js', './js/views/karte.js', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './vendor/leaflet/images/layers.png', './vendor/leaflet/images/layers-2x.png',
+  './js/lib/geo.js', './js/lib/zip.js', './js/lib/image.js', './js/lib/depth.js', './js/lib/pdf.js', './js/lib/pdf-fonts.js', './js/lib/xlsx.js',
+  './js/report/protokoll.js', './js/report/aufmass.js',
   './js/components/clockpicker.js', './js/components/photoview.js', './js/components/shaft.js',
   './js/views/projects.js', './js/views/project.js', './js/views/inspection.js', './js/views/editors.js',
-  './js/views/export.js', './js/views/settings.js', './js/views/report.js', './js/views/ai.js',
+  './js/views/export.js', './js/views/settings.js', './js/views/report.js', './js/views/ai.js', './js/views/berichte.js',
 ];
 
 self.addEventListener('install', (e) => {

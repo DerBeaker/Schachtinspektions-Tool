@@ -55,6 +55,7 @@ const P = {
   nav: 'M3 11l18-8-8 18-2-8z',
   pin: 'M12 21s-7-6-7-11a7 7 0 1114 0c0 5-7 11-7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
   layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
+  map: 'M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14',
   ruler: 'M4 16L16 4l4 4L8 20zM8 12l2 2M11 9l2 2M14 6l2 2',
   sparkles: 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
   alert: 'M12 4l9 16H3zM12 10v4M12 17h.01',
@@ -113,6 +114,7 @@ export function toast(msg, kind = 'info', ms = 2800) {
   toastHost.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, ms);
+  return t;
 }
 
 // ---- Sheets (Bottom-Sheet auf dem Handy, Dialog am PC) --------------------

@@ -2,7 +2,7 @@
 
 export const MAX_EDGE = 2400;
 
-function loadImage(blob) {
+export function loadImage(blob) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -12,7 +12,7 @@ function loadImage(blob) {
   });
 }
 
-function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.85) {
+export function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.85) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 

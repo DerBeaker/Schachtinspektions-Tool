@@ -58,7 +58,7 @@ export function fmtRelative(ts) {
 export function debounce(fn, ms = 300) {
   let t;
   const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-  d.flush = (...a) => { clearTimeout(t); fn(...a); };
+  d.flush = (...a) => { clearTimeout(t); return fn(...a); };
   return d;
 }
 

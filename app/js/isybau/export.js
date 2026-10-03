@@ -4,8 +4,9 @@ import { XmlWriter, esc, encodeLatin1 } from './xml.js';
 import { buildRecords, KZUSTAND_ORDER } from './model.js';
 import { bewerteInspektion, ZIELE } from './bewertung.js';
 
-export const APP_NAME = 'Schachtblick';
-export const APP_VERSION = '0.3.0';
+import { APP_NAME, APP_VERSION, VENDOR } from '../brand.js';
+
+export { APP_NAME, APP_VERSION };
 
 const NS_OFD = 'http://www.ofd-hannover.la/Identifikation';
 const NS_BFR = 'http://www.bfr-abwasser.de';
@@ -174,7 +175,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
     ['Inspektionszweck', project.zweck || '2'],
     ['Kodiersystem', profile.kodiersystem(project.kodiersystem || '10')],
     ['Auftragnehmer', (settings.company || '').slice(0, 60) || null],
-    ['Systemname', APP_NAME],
+    ['Systemname', `${APP_NAME} (${VENDOR})`.slice(0, 40)],
     ['Version', APP_VERSION],
     ['InspektionsdatumEnde', dates.length ? dates[dates.length - 1] : null],
   ]];
@@ -186,7 +187,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
     ['Datenkollektive', [
       ['Datenstatus', '1'],
       ['Erstellungsdatum', isoDate(today)],
-      ['Kommentar', `Schachtinspektionen – erstellt mit ${APP_NAME} ${APP_VERSION}`],
+      ['Kommentar', `Schachtinspektionen – erstellt mit ${APP_NAME} ${APP_VERSION} (${VENDOR})`],
       ['Kennungen', [['Kollektiv', [
         ['Kennung', kennung],
         ['Kollektivart', '2'],

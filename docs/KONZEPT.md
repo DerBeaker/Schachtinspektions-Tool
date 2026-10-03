@@ -2,6 +2,8 @@
 
 Dieses Dokument beantwortet die Ausgangsfragen „Wie wäre das umsetzbar?“ und beschreibt, was im Prototyp bereits umgesetzt ist, wo die Grenzen liegen und wie es weitergehen kann.
 
+Schachtblick ist ein Produkt von **MMSE Software Engineering** (www.mmse-software.com). Der Hersteller erscheint in der App (Startseite, Einstellungen → „Über“), in der Fußzeile jedes PDF-Berichts und in den Exportdateien (ISYBAU `Systemname`/`Kommentar`, Kommentar im DWA-M-150-Kopf).
+
 ## 1. Grundidee
 
 Ein Inspekteur steht am geöffneten Schacht, hat das Handy in der Hand und soll in wenigen Minuten fertig sein:
@@ -63,6 +65,30 @@ Grenze einer Web-App: Spezialsensoren wie der LiDAR-Scanner im iPhone Pro sind a
   Automatisch erzeugt werden Inspektionsanfang/-ende (DDB A/B), Anschlüsse als DCA+DCG-Paare, Streckenfeststellungen (A/B mit laufender Nummer), Übersichtsfoto als DDA, Fotodateinamen nach Konvention. Jeder ISYBAU-Export ist in den automatischen Tests **gegen das offizielle XSD-Schema seiner Version validiert** (BFR- und DWA-Kodierung). Für DWA-M 150 gibt es kein öffentliches XSD; Aufbau und Schlüssel folgen der offiziellen DWA-Beispieldatei.
 - Empfehlung vor dem ersten echten Projekt: einen Export mit der Prüfsoftware des Auftraggebers (z. B. PIETS) gegenprüfen lassen.
 
+### 4.1 Zustandsklassen (Bewertung)
+
+- Verfahren nach **BFR Abwasser Anhang A-3** (Stand 01/2025), das auch in den ISYBAU-Beispieldaten steckt: Für jeden Befund ergibt sich aus Kode, Charakterisierungen, Schachtbereich und Quantifizierung je Schutzziel (D Dichtheit, S Standsicherheit, B Betriebssicherheit) eine **vorläufige Einzelschadensklasse** (Tabellen A-3-38 … A-3-70). Bei Verformungen unterscheidet die Tabelle biegeweiche und biegesteife Werkstoffe.
+- **Zusatzpunkte** (Tab. A-3-4) aus Entwässerungsart, Abwasserart, Wasserschutzzone, Grundwasser, Bodenart und „im Bereich einer Verbindung“ → endgültige Einzelschadenszahl/-klasse.
+- **Objektbewertung**: maßgebender Schaden, Objektzahl vorläufig, Schadenslängenzuschlag (Strecken mit ihrer Länge, Punkte mit 0,5 m, bezogen auf die Schachttiefe) → **Objektklasse 0–5** (5 = umgehender Handlungsbedarf).
+- Randbedingungen kommen aus den Stammdaten (ISYBAU-Umweltparameter) oder werden je Projekt unter „Projekt & Auftrag“ eingetragen.
+- Die App zeigt die Klassen live beim Erfassen, je Befund, je Schacht und in der Schachtliste; im ISYBAU-Export (alle Versionen) stehen sie in `Klassifizierung` (je Zustand) und `Bewertung` (je Schacht, Bewertungsverfahren 1). Abschaltbar im Export.
+- **Prüfung**: Gegen die offiziellen, bewerteten ISYBAU-Beispieldaten 2024 stimmen alle 113 Schächte (Objektzahl und -klasse) und alle Einzelklassen überein.
+- **Nicht enthalten**: Bewertung nach DWA-M 149-3 (andere Klassenrichtung, Tabellen urheberrechtlich geschützt). Pauschale Einordnungen sind markiert (*) und vom Fachingenieur zu prüfen.
+
+### 4.2 Vorinspektionen
+
+Zustandsdaten früherer Inspektionen (ISYBAU-XML 2006–2024, DWA-M 150 KG/KI/KZ) werden beim Import erkannt – auch zusammen mit Stammdaten in einer Datei. Je Schacht wird die jüngste Inspektion gespeichert und in der Inspektion angezeigt (Befunde mit Klassen aus der Datei). Befunde lassen sich einzeln oder komplett übernehmen, Anschlüsse ebenfalls (DCA/DCG-Paare). Schächte, die nur in den Zustandsdaten vorkommen, werden angelegt.
+
+### 4.3 Berichte und Aufmaß
+
+- **Schachtprotokoll als PDF** (im Browser erzeugt, kein Server nötig): Firmenkopf mit Logo, Anschrift, Kontakt (Einstellungen); Kopfdaten; Übersichtsfoto mit Zifferblatt und Anschlüssen; Tabelle der Zustandsdaten in Exportreihenfolge mit Klassen; Bewertung; Befundfotos. Mehrere Schächte ergeben einen Sammelbericht mit Übersichtsseite (Tabelle und Klassenverteilung). Fußzeile mit Seitenzahl und Herstellerangabe.
+- **Aufmaß** als PDF (mit Unterschriftsfeldern Auftragnehmer/Auftraggeber) und Excel (XLSX): Position, Schacht, Straße, Datum, Tiefe, Tiefenstaffel, Mehrtiefe, Verfahren, Reinigung, Fotos, Befunde, Status; Summen je Staffel. Staffelgrenzen und Grenztiefe für die Mehrtiefe werden je Projekt gespeichert.
+- PDF und XLSX werden mit eigenem, kleinem Code erzeugt (keine Fremdbibliothek, funktioniert offline).
+
+### 4.4 Karte
+
+Schächte (Kreise, eingefärbt nach Status oder Objektklasse) und Leitungen eines Projekts auf der Karte; Koordinaten aus den Stammdaten (UTM/Gauß-Krüger → WGS84). Hintergrund: **basemap.de** (amtliche Karte des BKG, farbig oder grau) oder OpenStreetMap. Kartenbibliothek Leaflet liegt in `app/vendor/` (keine externe Einbindung). Die Kartenkacheln brauchen eine Internetverbindung; ohne Netz bleiben Schachtliste und „In der Nähe“ nutzbar.
+
 ## 5. Tiefen automatisch aus dem Foto?
 
 Ehrliche Einordnung – ISYBAU verlangt Lagen auf den Zentimeter (zwei Nachkommastellen in Metern):
@@ -102,12 +128,14 @@ Realistische Erwartung:
 - Jede Firma sieht nur ihre Daten (Mandantentrennung in jeder Abfrage, per Test geprüft).
 - Fotos und Konfiguration per `.htaccess` gegen Direktzugriff gesperrt; besser Fotoordner außerhalb des Webordners.
 - HTTPS ist Pflicht (Kamera/GPS funktionieren sonst nicht).
+- Die Kartenansicht lädt Kartenkacheln von basemap.de (BKG) bzw. OpenStreetMap; dabei wird – wie bei jedem Kartendienst – die IP-Adresse des Geräts übertragen, aber keine Projektdaten.
+- PDF-Berichte, Aufmaß und Exporte entstehen vollständig auf dem Gerät.
 
 ## 8. Stand des Prototyps
 
-- Frontend: Projekte, Import, Schachtliste mit GPS, Inspektion (Foto/Uhr, Anschlüsse, Befunde, Kopfdaten), Plausibilität, Export, Protokoll, Einstellungen, Offline.
+- Frontend: Projekte, Import (Stamm- und Zustandsdaten), Schachtliste mit GPS, Karte, Inspektion (Foto/Uhr, Anschlüsse, Befunde, Kopfdaten, Vorinspektion), Plausibilität, Zustandsklassen, Export, PDF-Protokolle, Aufmaß, Einstellungen mit Firmenlogo, Offline.
 - Server: Einrichtung, Login, Benutzerverwaltung, Sync, Fotos, KI-Route.
-- Tests: Unit-Tests (Import ISYBAU und DWA-M 150, Export mit XSD-Validierung 2006/2013/2017/2024, DWA-M-150-Struktur, Regeln, ZIP, Koordinaten, Laser-Eingaben), Server-Tests (SQLite, inkl. Mandantentrennung und KI-Anfrageformat), Browser-Tests (kompletter Ablauf auf Handy-Größe inkl. Export in drei Formaten und Sync Handy → PC).
+- Tests: Unit-Tests (Import ISYBAU und DWA-M 150, Export mit XSD-Validierung 2006/2013/2017/2024, DWA-M-150-Struktur, Bewertung gegen die offiziellen Beispieldaten, Vorinspektion, PDF/Aufmaß/XLSX, Regeln, ZIP, Koordinaten, Laser-Eingaben), Server-Tests (SQLite, inkl. Mandantentrennung und KI-Anfrageformat), Browser-Tests (kompletter Ablauf auf Handy-Größe inkl. Export in drei Formaten, PDF-Protokoll, Aufmaß PDF/Excel und Sync Handy → PC).
 
 ## 9. Roadmap (Vorschlag)
 
@@ -117,11 +145,12 @@ Realistische Erwartung:
 - Auf IONOS installieren, Team-Server einrichten.
 
 **Phase 2 – Ausbau**
-- Zustandsbewertung/Schadensklassen (ISYBAU-Bewertung bzw. DWA-M 149-3) und Bewertungsfelder im Export.
-- Import vorhandener Zustandsdaten (Vorinspektionen zum Vergleich).
+- ✔ Zustandsbewertung nach BFR Abwasser A-3 mit Bewertungsfeldern im Export, ✔ Vorinspektionen, ✔ Karte, ✔ PDF-Berichte mit Logo, ✔ Aufmaß.
+- KI-Analyse der Fotos im Praxistest weiterentwickeln (zurückgestellt).
+- Bewertung nach DWA-M 149-3, sobald die Tabellen lizenziert vorliegen.
 - DWA-M 149-2 in der aktuellen Ausgabe: DWA-spezifische Charakterisierungen ergänzen, die über die BFR-Liste hinausgehen.
-- Kartenansicht der Schächte, mehrere Übersichtsfotos (z. B. Schachtkamera/360°).
-- Auftraggeber-Profile (Pflichtfelder, Bezugspunkte, Fotokonventionen).
+- Firmenlogo und Firmendaten über den Team-Server für alle Geräte verteilen; mehrere Übersichtsfotos (z. B. Schachtkamera/360°).
+- Auftraggeber-Profile (Pflichtfelder, Bezugspunkte, Fotokonventionen, Aufmaßpositionen mit Preisen).
 
 **Phase 3 – Für andere Firmen**
 - Selbstregistrierung von Firmen, Lizenz/Abrechnung, Mandanten-Admin.

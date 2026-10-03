@@ -97,11 +97,40 @@ if (await confirmBtn.isVisible().catch(() => false)) await confirmBtn.click();
 await page.getByText('S1005').first().waitFor();
 await shot('11-projekt-nach-abschluss');
 
+step('Einstellungen: Firma und Logo für Berichte');
+await page.evaluate(() => { location.hash = '#/settings'; });
+await page.getByText('Firma (Kopf der Berichte)').waitFor();
+await page.getByLabel('Firma (Auftragnehmer)').fill('Kanal-Service Prüfmann GmbH');
+await page.getByLabel('Anschrift').fill('Hauptstraße 1\n12345 Musterstadt');
+await page.getByLabel('Kontakt').fill('Tel. 0123 4567');
+{
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Logo wählen' }).click()]);
+  await fc.setFiles(photo);
+  await page.locator('img.logo-preview').waitFor();
+}
+if (!(await page.getByText('MMSE Software Engineering').first().isVisible())) errors.push('Herstellerangabe in den Einstellungen fehlt');
+await page.screenshot({ path: `${outDir}/11b-einstellungen.png`, fullPage: true });
+await page.goBack();
+await page.getByText('S1005').first().waitFor();
+
 step('Export');
-await page.getByRole('button', { name: 'Export', exact: true }).click();
+await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
 await page.getByRole('button', { name: 'Exportieren' }).waitFor();
 await shot('12-export');
 const { readFileSync } = await import('node:fs');
+/** Datei über einen Button erzeugen (Download oder – falls angeboten – Teilen-Dialog „Speichern“). */
+async function fileFrom(name) {
+  const dl = page.waitForEvent('download', { timeout: 30000 });
+  await page.getByRole('button', { name, exact: true }).click();
+  const save = page.locator('.sheet').getByRole('button', { name: 'Speichern' });
+  save.waitFor({ timeout: 3000 }).then(() => save.click()).catch(() => {});
+  const d = await dl;
+  const p = `${outDir}/${d.suggestedFilename()}`;
+  await d.saveAs(p);
+  console.log('  Download:', p);
+  return p;
+}
+const pdfText = (p) => { try { return execSync(`pdftotext -layout "${p}" -`).toString(); } catch { return null; } };
 async function exportAs(format) {
   if (format) await page.locator('main select').first().selectOption(format);
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportieren' }).click()]);
@@ -137,6 +166,37 @@ async function exportAs(format) {
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
 }
 
+step('Berichte: Schachtprotokolle und Aufmaß');
+await page.locator('main select').first().selectOption('2017-07');
+{
+  const p = await fileFrom('Schachtprotokolle (PDF)');
+  const b = readFileSync(p);
+  if (b.subarray(0, 5).toString() !== '%PDF-') errors.push('Schachtprotokoll ist kein PDF');
+  const t = pdfText(p);
+  if (t !== null) {
+    if (!/Kanal-Service Prüfmann GmbH/.test(t)) errors.push('PDF: Firmenname fehlt');
+    if (!/S1005/.test(t) || !/DAB/.test(t)) errors.push('PDF: Schacht/Befund fehlt');
+    if (!/www\.mmse-software\.com/.test(t)) errors.push('PDF: Herstellerzeile fehlt');
+  }
+  if (!/\/Subtype \/Image/.test(b.toString('latin1'))) errors.push('PDF: Logo/Fotos fehlen');
+}
+await page.getByLabel('Tiefenstaffel (m)').fill('1,5; 2,5');
+{
+  const p = await fileFrom('Aufmaß (PDF)');
+  const t = pdfText(p);
+  if (t !== null && (!/Aufmaß/.test(t) || !/S1005/.test(t) || !/über 1,50 bis 2,50 m/.test(t))) errors.push('Aufmaß-PDF: Inhalt/Tiefenstaffel fehlt');
+}
+{
+  const p = await fileFrom('Aufmaß (Excel)');
+  const b = readFileSync(p);
+  if (b.subarray(0, 2).toString() !== 'PK') errors.push('Aufmaß-Excel ist keine XLSX-Datei');
+  try {
+    const x = execSync(`unzip -p "${p}" xl/worksheets/sheet1.xml`).toString();
+    if (!/S1005/.test(x)) errors.push('Aufmaß-Excel: S1005 fehlt');
+  } catch { /* unzip fehlt */ }
+}
+await page.screenshot({ path: `${outDir}/12d-berichte.png`, fullPage: true });
+
 step('Höhenangaben auf „von oben“ umstellen');
 await page.goBack();
 await page.getByText('S1005', { exact: true }).click();
@@ -145,7 +205,7 @@ await page.getByRole('radio', { name: 'von oben ↓' }).click();
 await page.getByText('Anfang am Deckel = 0,00 m').waitFor();
 await shot('12c-von-oben');
 await page.goBack();
-await page.getByRole('button', { name: 'Export', exact: true }).click();
+await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
 await page.getByRole('button', { name: 'Exportieren' }).waitFor();
 {
   const z = await exportAs('2017-07');
@@ -160,7 +220,17 @@ step('Protokoll');
 await page.goBack();
 await page.getByText('S1005', { exact: true }).click();
 await page.getByRole('button', { name: 'Mehr' }).click();
-await page.getByText('Schachtprotokoll').click();
+{
+  const dl = page.waitForEvent('download', { timeout: 30000 });
+  await page.getByText('Schachtprotokoll als PDF').click();
+  const save = page.locator('.sheet').getByRole('button', { name: 'Speichern' });
+  save.waitFor({ timeout: 3000 }).then(() => save.click()).catch(() => {});
+  const d = await dl;
+  if (!/^Schachtprotokoll_S1005_.*\.pdf$/.test(d.suggestedFilename())) errors.push('Einzelprotokoll: Dateiname ' + d.suggestedFilename());
+  await d.saveAs(`${outDir}/${d.suggestedFilename()}`);
+}
+await page.getByRole('button', { name: 'Mehr' }).click();
+await page.getByText('Schachtprotokoll (Druckansicht)').click();
 await page.getByText('Zustandsdaten (ISYBAU-Datensätze)').waitFor();
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${outDir}/13-protokoll.png`, fullPage: true });

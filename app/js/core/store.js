@@ -20,6 +20,9 @@ function touch(rec) {
 export const DEFAULT_SETTINGS = {
   inspector: '',
   company: '',
+  companyAddress: '',
+  companyContact: '',
+  logo: '', // Firmenlogo als JPEG-Data-URL (für PDF-Berichte)
   bezugVertikal: '1',
   exportVersion: '2017-07',
   serverUrl: '',

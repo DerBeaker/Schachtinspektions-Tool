@@ -1,4 +1,4 @@
-// Einstellungen: Inspekteur, Firma, Darstellung, Server-Anmeldung, Speicher.
+// Einstellungen: Inspekteur, Firma (für Berichte), Darstellung, Server-Anmeldung, Speicher, Über.
 
 import { h, clear, btn, icon, toast, field, input, select, toggle, confirmDialog, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
@@ -6,7 +6,8 @@ import { getSettings, saveSettings, storageInfo } from '../core/store.js';
 import { sync } from '../sync.js';
 import { db } from '../core/db.js';
 import { BEZUG_VERTIKAL } from '../data/reflists.js';
-import { APP_NAME, APP_VERSION } from '../isybau/export.js';
+import { APP_NAME, APP_VERSION, VENDOR, VENDOR_URL, VENDOR_WEB, VENDOR_TAGLINE } from '../brand.js';
+import { pickFile } from '../lib/image.js';
 
 export async function renderSettings(view) {
   const s = await getSettings();
@@ -96,14 +97,42 @@ export async function renderSettings(view) {
     });
   }
 
+  const logoBox = h('div', { class: 'logo-box' });
+  function renderLogo() {
+    clear(logoBox,
+      s.logo ? h('img', { class: 'logo-preview', src: s.logo, alt: 'Firmenlogo' }) : h('div', { class: 'logo-preview empty muted small' }, 'kein Logo'),
+      h('div', { class: 'row wrap' },
+        btn(s.logo ? 'Ändern' : 'Logo wählen', { icon: 'image', variant: 'soft', small: true, onClick: async () => {
+          const file = await pickFile('image/png,image/jpeg,image/svg+xml,image/webp');
+          if (!file) return;
+          try {
+            const { logoAusDatei } = await import('./berichte.js');
+            s.logo = await logoAusDatei(file);
+            await save();
+            renderLogo();
+            toast('Logo gespeichert.', 'ok');
+          } catch (e) { toast('Bild konnte nicht gelesen werden: ' + e.message, 'error'); }
+        } }),
+        s.logo ? btn('Entfernen', { icon: 'trash', variant: 'ghost', small: true, onClick: async () => { s.logo = ''; await save(); renderLogo(); } }) : null));
+  }
+  renderLogo();
+
   clear(view, topbar({ back: '#/', title: 'Einstellungen' }), main);
   main.append(h('div', { class: 'layout-2' },
     h('div', { class: 'stack' },
       h('div', { class: 'card card-pad stack' },
-        h('h3', 'Inspekteur & Firma'),
+        h('h3', 'Inspekteur'),
         field('Name des Inspekteurs', input(s.inspector, set('inspector'), { autocomplete: 'name', placeholder: 'Vor- und Nachname' }), 'Wird in jede neue Inspektion übernommen (ISYBAU „NameUntersucher“).'),
-        field('Firma (Auftragnehmer)', input(s.company, set('company'), { autocomplete: 'organization' })),
         field('Höhenangaben für neue Projekte', select(s.bezugVertikal || '1', BEZUG_VERTIKAL, set('bezugVertikal')), 'Pro Projekt unter „Projekt & Auftrag“ änderbar.')),
+      h('div', { class: 'card card-pad stack' },
+        h('h3', 'Firma (Kopf der Berichte)'),
+        field('Firma (Auftragnehmer)', input(s.company, set('company'), { autocomplete: 'organization' })),
+        field('Anschrift', h('textarea', { class: 'input', rows: 2, placeholder: 'Straße Nr.\nPLZ Ort', oninput: (e) => set('companyAddress')(e.target.value) }, s.companyAddress || '')),
+        field('Kontakt', input(s.companyContact, set('companyContact'), { placeholder: 'Tel. · E-Mail · Web' })),
+        h('div', { class: 'field', role: 'group', 'aria-label': 'Firmenlogo' },
+          h('span', { class: 'field-label' }, 'Firmenlogo'),
+          logoBox,
+          h('span', { class: 'field-hint' }, 'PNG oder JPG, erscheint oben rechts in Schachtprotokollen und im Aufmaß. Wird nur auf diesem Gerät gespeichert.'))),
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Darstellung'),
         field('Farbschema', select(s.theme || '', [['', 'automatisch (System)'], ['light', 'hell – besser bei Sonne'], ['dark', 'dunkel']], (v) => {
@@ -123,9 +152,16 @@ export async function renderSettings(view) {
             navigate('#/');
           } }))),
       h('div', { class: 'card card-pad stack-sm' },
-        h('h3', `${APP_NAME} ${APP_VERSION}`),
+        h('div', { class: 'about-head' },
+          h('img', { class: 'about-logo', src: './icons/mmse-logo.png', alt: VENDOR, width: 160, height: 87 }),
+          h('div', { class: 'grow' },
+            h('h3', `${APP_NAME} ${APP_VERSION}`),
+            h('div', { class: 'small' }, `von ${VENDOR}`),
+            h('div', { class: 'muted small' }, VENDOR_TAGLINE),
+            h('a', { class: 'small', href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB))),
         h('p', { class: 'muted small' }, 'Kodiersystem: DIN EN 13508-2:2011 mit nationaler Festlegung nach BFR Abwasser (ISYBAU, Stand 01/2025) bzw. DWA-M 149-2. Austauschformate: ISYBAU XML-2006, -2013, -2017, -2024 und DWA-M 150.'),
-        h('p', { class: 'muted small' }, 'Die Kodierung bleibt fachliche Verantwortung des Inspekteurs. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel und ersetzen keine Prüfung bzw. kein Aufmaß.')))));
+        h('p', { class: 'muted small' }, 'Die Kodierung bleibt fachliche Verantwortung des Inspekteurs. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel und ersetzen keine Prüfung bzw. kein Aufmaß.'),
+        h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · Kartendaten © basemap.de / BKG, © OpenStreetMap-Mitwirkende · Leaflet (BSD-2-Clause)`)))));
   renderServer();
   const info = await storageInfo();
   storageEl.textContent = info ? `${(info.used / 1048576).toFixed(1)} MB belegt von ca. ${(info.quota / 1073741824).toFixed(1)} GB verfügbar` : 'Speicherinfo nicht verfügbar.';

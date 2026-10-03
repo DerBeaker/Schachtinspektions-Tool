@@ -1,6 +1,7 @@
-// Export: ISYBAU-Zustandsdaten (2006–2024) oder DWA-M 150 (XML + Fotos als ZIP).
+// Export & Berichte: ISYBAU-Zustandsdaten (2006–2024) oder DWA-M 150 (XML + Fotos als ZIP),
+// Schachtprotokolle als PDF und Aufmaß (PDF/Excel).
 
-import { h, clear, btn, icon, toast, field, select, toggle, badge, sheet } from '../core/ui.js';
+import { h, clear, btn, icon, toast, field, input, select, toggle, badge, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
 import { getProject, saveProject, listManholes, getSettings, saveSettings, getPhoto } from '../core/store.js';
 import { exportZustandsdaten, exportFileName, EXPORT_FORMATS } from '../isybau/export.js';
@@ -8,6 +9,7 @@ import { exportM150, m150FileName, M150_VARIANTEN } from '../isybau/m150.js';
 import { validateInspection } from '../isybau/validate.js';
 import { zipParts } from '../lib/zip.js';
 import { download } from '../core/util.js';
+import { protokollErzeugen, aufmassErzeugen } from './berichte.js';
 
 export async function renderExport(view, projectId) {
   const project = await getProject(projectId);
@@ -109,16 +111,46 @@ export async function renderExport(view, projectId) {
         + (v < '2017' ? ` Pflichtangabe Liegenschaft: ${project.liegenschaftNummer || project.auftragNummer || '0'} / ${project.liegenschaftBezeichnung || project.name} (änderbar unter Projekt & Auftrag).` : '');
     clear(hint, txt + ' Fotodateien „Schacht-001.jpg“.');
   };
-  clear(view, topbar({ back: `#/p/${projectId}`, title: 'Export', sub: project.name }), main);
+  // ---- Berichte & Aufmaß
+  const rep = { fotos: project.berichtFotos !== false };
+  const aufmass = { staffel: '2; 3; 5', grenztiefe: '3', ...(project.aufmass || {}) };
+  const reportItems = () => candidates().map((m) => ({ manhole: m, inspection: m.inspection }));
+  const guard = (fn) => async () => {
+    const items = reportItems();
+    if (!items.length) { toast('Keine Inspektionen im gewählten Umfang.', 'info'); return; }
+    await fn(items);
+  };
+  const saveAufmass = async () => {
+    if (JSON.stringify(project.aufmass || {}) === JSON.stringify(aufmass)) return;
+    project.aufmass = { ...aufmass };
+    await saveProject(project);
+  };
+  const berichte = h('div', { class: 'card card-pad stack' },
+    h('h3', 'Berichte & Aufmaß'),
+    h('p', { class: 'muted small' }, 'PDF mit Firmenlogo, Anschrift und Kontakt aus den ',
+      h('a', { href: '#/settings' }, 'Einstellungen'), '. Es gilt der oben gewählte Umfang.',
+      settings.logo ? null : ' Noch kein Logo hinterlegt.'),
+    toggle(rep.fotos, async (v) => { rep.fotos = v; project.berichtFotos = v; await saveProject(project); }, 'Fotos der Befunde ins Protokoll'),
+    btn('Schachtprotokolle (PDF)', { icon: 'printer', block: true, onClick: guard((items) => protokollErzeugen({ project, items, fotos: rep.fotos })) }),
+    h('div', { class: 'grid2' },
+      field('Tiefenstaffel (m)', input(aufmass.staffel, (v) => { aufmass.staffel = v; }, { placeholder: '2; 3; 5', inputmode: 'decimal' }), 'Grenzen, getrennt durch „;“'),
+      field('Mehrtiefe ab (m)', input(aufmass.grenztiefe, (v) => { aufmass.grenztiefe = v; }, { placeholder: '3', inputmode: 'decimal' }), '0 = keine Mehrtiefe')),
+    h('div', { class: 'row wrap' },
+      btn('Aufmaß (PDF)', { icon: 'file', variant: 'soft', onClick: guard(async (items) => { await saveAufmass(); await aufmassErzeugen({ project, items, format: 'pdf' }); }) }),
+      btn('Aufmaß (Excel)', { icon: 'list', variant: 'soft', onClick: guard(async (items) => { await saveAufmass(); await aufmassErzeugen({ project, items, format: 'xlsx' }); }) })));
+
+  clear(view, topbar({ back: `#/p/${projectId}`, title: 'Export & Berichte', sub: project.name }), main);
   main.append(h('div', { class: 'layout-2' },
-    h('div', { class: 'card card-pad stack' },
-      h('h3', 'Einstellungen'),
-      field('Format', select(opts.version, EXPORT_FORMATS, (v) => { opts.version = v; renderHint(); }), 'Wird pro Projekt gemerkt.'),
-      varField, bewToggle,
-      field('Umfang', select(opts.scope, [['fertig', 'nur abgeschlossene Schächte'], ['alle', 'alle begonnenen Inspektionen']], (v) => { opts.scope = v; renderList(); })),
-      toggle(opts.photos, (v) => { opts.photos = v; }, 'Fotos mitliefern (ZIP mit Ordner „Fotos“)'),
-      hint),
-    h('div', { class: 'stack' }, summary, listEl)));
+    h('div', { class: 'stack' },
+      h('div', { class: 'card card-pad stack' },
+        h('h3', 'Datenexport'),
+        field('Format', select(opts.version, EXPORT_FORMATS, (v) => { opts.version = v; renderHint(); }), 'Wird pro Projekt gemerkt.'),
+        varField, bewToggle,
+        field('Umfang', select(opts.scope, [['fertig', 'nur abgeschlossene Schächte'], ['alle', 'alle begonnenen Inspektionen']], (v) => { opts.scope = v; renderList(); })),
+        toggle(opts.photos, (v) => { opts.photos = v; }, 'Fotos mitliefern (ZIP mit Ordner „Fotos“)'),
+        hint),
+      summary),
+    h('div', { class: 'stack' }, berichte, listEl)));
   renderHint();
   renderList();
 }

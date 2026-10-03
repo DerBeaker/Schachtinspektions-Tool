@@ -1,7 +1,7 @@
 {
   "name": "Schachtblick – Schachtinspektion",
   "short_name": "Schachtblick",
-  "description": "Schachtinspektion nach ISYBAU und DWA-M 149-2 mit Foto, Kodierung und ISYBAU-XML-Export.",
+  "description": "Schachtinspektion nach ISYBAU und DWA-M 149-2 mit Foto, Kodierung und ISYBAU-XML-Export. Von MMSE Software Engineering (www.mmse-software.com).",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

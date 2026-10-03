@@ -491,7 +491,12 @@ export async function renderInspection(view, manholeId, params) {
   // ------------------------------------------------------------------ Menü
   function moreMenu() {
     menu([
-      { label: 'Schachtprotokoll (Drucken/PDF)', icon: 'printer', onClick: () => { persist.flush(); navigate(`#/r/${insp.id}`); } },
+      { label: 'Schachtprotokoll als PDF', icon: 'file', onClick: async () => {
+        await persist.flush();
+        const { protokollErzeugen } = await import('./berichte.js');
+        await protokollErzeugen({ project, items: [{ manhole, inspection: insp }], fotos: project.berichtFotos !== false });
+      } },
+      { label: 'Schachtprotokoll (Druckansicht)', icon: 'printer', onClick: () => { persist.flush(); navigate(`#/r/${insp.id}`); } },
       aiAvailable() && insp.overview?.photoId ? { label: 'KI-Analyse des Fotos', icon: 'sparkles', onClick: aiFlow } : null,
       manhole.wgs ? { label: 'Navigation zum Schacht', icon: 'nav', onClick: () => window.open(navUrl(manhole.wgs), '_blank', 'noopener') } : null,
       { label: 'Inspektion verwerfen', icon: 'trash', danger: true, onClick: async () => {

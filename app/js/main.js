@@ -10,6 +10,7 @@ import { renderInspection } from './views/inspection.js';
 import { renderExport } from './views/export.js';
 import { renderSettings } from './views/settings.js';
 import { renderReport } from './views/report.js';
+import { renderKarte } from './views/karte.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -29,6 +30,7 @@ async function route() {
     let c;
     if (!parts.length) c = await renderProjects(view);
     else if (parts[0] === 'p' && parts[2] === 'export') c = await renderExport(view, parts[1]);
+    else if (parts[0] === 'p' && parts[2] === 'karte') c = await renderKarte(view, parts[1]);
     else if (parts[0] === 'p') c = await renderProject(view, parts[1], params);
     else if (parts[0] === 's') c = await renderInspection(view, parts[1], params);
     else if (parts[0] === 'r') c = await renderReport(view, parts[1]);

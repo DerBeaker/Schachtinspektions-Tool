@@ -6,6 +6,10 @@ import { listProjects, createProject, importIntoProject, getSettings } from '../
 import { fmtRelative, readFile } from '../core/util.js';
 import { pickFile } from '../lib/image.js';
 import { formatLabel } from '../isybau/export.js';
+import { APP_NAME, VENDOR, VENDOR_URL, VENDOR_WEB } from '../brand.js';
+
+const vendorLine = () => h('footer', { class: 'vendor-line muted small' },
+  `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB));
 
 export async function renderProjects(view) {
   const settings = await getSettings();
@@ -40,6 +44,7 @@ export async function renderProjects(view) {
       empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere Stammdaten (ISYBAU oder DWA-M 150). Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
         btn('Leeres Projekt', { icon: 'plus', variant: 'soft', onClick: newProjectSheet }))));
     if (!settings.inspector) main.append(firstRunHint());
+    main.append(vendorLine());
     return;
   }
 
@@ -54,6 +59,7 @@ export async function renderProjects(view) {
         h('div', { class: 'progress' }, h('span', { style: { width: pct + '%' } }))),
       icon('chevron', 20));
   })));
+  main.append(vendorLine());
 }
 
 function heroArt() {

@@ -172,12 +172,14 @@ export async function renderProject(view, projectId, params) {
     topbar({
       back: '#/', title: project.name, sub: [project.ort, project.kodiersystem === '9' ? 'DWA-M 149-2' : 'ISYBAU'].filter(Boolean).join(' · '),
       actions: [
-        btn('', { icon: 'download', variant: 'ghost', aria: 'Export', onClick: () => navigate(`#/p/${projectId}/export`) }),
+        btn('', { icon: 'map', variant: 'ghost', aria: 'Karte', onClick: () => navigate(`#/p/${projectId}/karte`) }),
+        btn('', { icon: 'download', variant: 'ghost', aria: 'Export & Berichte', onClick: () => navigate(`#/p/${projectId}/export`) }),
         btn('', { icon: 'more', variant: 'ghost', aria: 'Mehr', onClick: () => menu([
           { label: 'Projekt & Auftragsdaten', icon: 'edit', onClick: editProject },
           { label: 'Stammdaten (nach-)importieren', icon: 'upload', onClick: () => importFlow(projectId) },
+          { label: 'Karte', icon: 'map', onClick: () => navigate(`#/p/${projectId}/karte`) },
           { label: 'Schacht manuell anlegen', icon: 'plus', onClick: addSheet },
-          { label: 'Export (ISYBAU / DWA-M 150)', icon: 'download', onClick: () => navigate(`#/p/${projectId}/export`) },
+          { label: 'Export, Berichte & Aufmaß', icon: 'download', onClick: () => navigate(`#/p/${projectId}/export`) },
           { label: 'Projekt löschen', icon: 'trash', danger: true, onClick: async () => {
             if (await confirmDialog(`Projekt „${project.name}“ mit allen Inspektionen und Fotos auf diesem Gerät löschen?`, { ok: 'Löschen', danger: true })) {
               await deleteProject(projectId);

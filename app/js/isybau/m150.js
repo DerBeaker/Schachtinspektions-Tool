@@ -7,7 +7,8 @@
 
 import { child, children, text, XmlWriter, encodeLatin1 } from './xml.js';
 import { buildRecords } from './model.js';
-import { photoNamer, APP_NAME, APP_VERSION } from './export.js';
+import { photoNamer } from './export.js';
+import { APP_NAME, APP_VERSION, VENDOR, VENDOR_WEB } from '../brand.js';
 import { CODES } from '../data/codes.js';
 import { detectCrs } from '../lib/geo.js';
 import { REF } from '../data/reflists.js';
@@ -445,7 +446,7 @@ export function exportM150({ project, items, settings = {}, variante = project.m
 
   const xml = [
     '<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>',
-    `<!-- DWA-M 150, Typ B - erstellt mit ${APP_NAME} ${APP_VERSION} -->`,
+    `<!-- DWA-M 150, Typ B - erstellt mit ${APP_NAME} ${APP_VERSION} (${VENDOR}, ${VENDOR_WEB}) -->`,
     '<DATA>',
     w.toString(),
     '</DATA>',
