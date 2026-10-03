@@ -8,6 +8,7 @@ import { fmtM, num } from '../core/util.js';
 import { distance, navUrl } from '../lib/geo.js';
 import { importFlow } from './projects.js';
 import { validateInspection } from '../isybau/validate.js';
+import { EXPORT_FORMATS } from '../isybau/export.js';
 
 const STATUS = { offen: 'offen', inArbeit: 'in Arbeit', fertig: 'fertig' };
 
@@ -44,7 +45,7 @@ export async function renderProject(view, projectId, params) {
       list = list.map((m) => ({ m, d: m.wgs ? distance(state.pos, m.wgs) : Infinity })).sort((a, b) => a.d - b.d).map((x) => ({ ...x.m, _d: x.d }));
     }
     if (!manholes.length) {
-      clear(listEl, h('div', { class: 'card' }, empty('manhole', 'Noch keine Schächte', 'Importiere ISYBAU-Stammdaten oder lege Schächte manuell an.',
+      clear(listEl, h('div', { class: 'card' }, empty('manhole', 'Noch keine Schächte', 'Importiere Stammdaten (ISYBAU oder DWA-M 150) oder lege Schächte manuell an.',
         btn('Stammdaten importieren', { icon: 'upload', variant: 'primary', onClick: () => importFlow(projectId) }),
         btn('Schacht anlegen', { icon: 'plus', onClick: addSheet }))));
       return;
@@ -97,7 +98,7 @@ export async function renderProject(view, projectId, params) {
       body: h('div', { class: 'stack' },
         field('Schachtbezeichnung', input('', (v) => (d.name = v), { placeholder: 'z. B. S1234', autocapitalize: 'characters' })),
         field('Straße', input('', (v) => (d.strasse = v))),
-        field('Schachttiefe (m)', numInput('', (v) => (d.tiefe = v), { placeholder: 'Deckel bis Sohle, z. B. 2,35' }))),
+        field('Schachttiefe (m)', numInput('', (v) => (d.tiefe = v), { placeholder: 'Deckel bis Sohle, z. B. 2,35', unit: 'm' }))),
       actions: [btn('Anlegen', { variant: 'primary', onClick: async () => {
         if (!d.name.trim()) return toast('Bezeichnung fehlt.', 'error');
         if (manholes.some((m) => m.name === d.name.trim())) return toast('Diese Bezeichnung gibt es schon.', 'error');
@@ -115,6 +116,7 @@ export async function renderProject(view, projectId, params) {
       body: h('div', { class: 'stack' },
         field('Projektname', input(p.name, (v) => (p.name = v))),
         field('Ort / Liegenschaft', input(p.ort, (v) => (p.ort = v))),
+        field('Auftraggeber', input(p.auftraggeber, (v) => (p.auftraggeber = v), { placeholder: 'z. B. Stadt Musterstadt' })),
         field('Auftragsbezeichnung', input(p.auftragBezeichnung, (v) => (p.auftragBezeichnung = v)), 'Pflichtfeld im ISYBAU-Export (max. 60 Zeichen)'),
         h('div', { class: 'grid2' },
           field('Auftragsnummer', input(p.auftragNummer, (v) => (p.auftragNummer = v))),
@@ -122,7 +124,12 @@ export async function renderProject(view, projectId, params) {
         field('Inspektionszweck', select(p.zweck, REF.U101, (v) => (p.zweck = v))),
         field('Kodiersystem', select(p.kodiersystem, REF.U102, (v) => (p.kodiersystem = v)),
           'ISYBAU (BFR Abwasser) ist strenger als DWA-M 149-2 – die Hauptkodes sind identisch.'),
-        field('Vertikaler Bezugspunkt (Standard für neue Inspektionen)', select(p.bezugVertikal, REF.U115, (v) => (p.bezugVertikal = v)))),
+        field('Vertikaler Bezugspunkt (Standard für neue Inspektionen)', select(p.bezugVertikal, REF.U115, (v) => (p.bezugVertikal = v))),
+        field('Abgabeformat', select(p.exportFormat || '2017-07', EXPORT_FORMATS, (v) => (p.exportFormat = v)), 'Was der Auftraggeber verlangt – im Export änderbar.'),
+        h('div', { class: 'grid2' },
+          field('Liegenschaft Nr.', input(p.liegenschaftNummer, (v) => (p.liegenschaftNummer = v), { maxlength: 20 })),
+          field('Liegenschaft Name', input(p.liegenschaftBezeichnung, (v) => (p.liegenschaftBezeichnung = v), { maxlength: 40 }))),
+        h('p', { class: 'muted small' }, 'Liegenschaft ist nur in ISYBAU 2006/2013 Pflicht; leer = Auftragsnummer bzw. Projektname.')),
       actions: [btn('Speichern', { variant: 'primary', onClick: async () => {
         Object.assign(project, p);
         await saveProject(project);
@@ -147,7 +154,7 @@ export async function renderProject(view, projectId, params) {
           { label: 'Projekt & Auftragsdaten', icon: 'edit', onClick: editProject },
           { label: 'Stammdaten (nach-)importieren', icon: 'upload', onClick: () => importFlow(projectId) },
           { label: 'Schacht manuell anlegen', icon: 'plus', onClick: addSheet },
-          { label: 'ISYBAU-Export', icon: 'download', onClick: () => navigate(`#/p/${projectId}/export`) },
+          { label: 'Export (ISYBAU / DWA-M 150)', icon: 'download', onClick: () => navigate(`#/p/${projectId}/export`) },
           { label: 'Projekt löschen', icon: 'trash', danger: true, onClick: async () => {
             if (await confirmDialog(`Projekt „${project.name}“ mit allen Inspektionen und Fotos auf diesem Gerät löschen?`, { ok: 'Löschen', danger: true })) {
               await deleteProject(projectId);

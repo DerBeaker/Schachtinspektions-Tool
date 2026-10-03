@@ -231,7 +231,7 @@ export async function renderInspection(view, manholeId, params) {
     }
   }
   function depthDialog({ top, bot, photo }) {
-    const d = { dTop: 625, dBottom: Math.round((manhole.schacht?.dn || 1) * 1000) || 1000 };
+    const d = { dTop: Math.round((manhole.deckel?.dn || 0.625) * 1000), dBottom: Math.round((manhole.schacht?.unterteilDn || manhole.schacht?.dn || 1) * 1000) || 1000 };
     const out = h('div');
     const calc = () => {
       const r = estimateDepth({ top, bottom: bot, dTop: d.dTop, dBottom: d.dBottom, width: photo.width, height: photo.height, f35: photo.exif?.f35 });
@@ -372,7 +372,7 @@ export async function renderInspection(view, manholeId, params) {
   // ------------------------------------------------------------------ Daten
   function renderData() {
     const set = (k) => (val) => { insp[k] = val; changed(false); };
-    const stamm = manhole.source === 'isybau';
+    const stamm = manhole.source === 'isybau' || manhole.source === 'm150';
     clear(main, h('div', { class: 'layout-2' },
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Inspektion'),
@@ -392,11 +392,12 @@ export async function renderInspection(view, manholeId, params) {
         h('div', { class: 'card card-pad stack' },
           h('h3', 'Tiefe & Bezug'),
           field('Schachttiefe (OK Deckel bis Sohle tiefster Auslauf)', h('div', { class: 'input-unit' },
-            numInput(insp.tiefe, (val) => { insp.tiefe = val === '' ? null : Number(val); insp.tiefeQuelle = 'gemessen'; changed(false); }), h('span', { class: 'unit' }, 'm')),
+            numInput(insp.tiefe, (val) => { insp.tiefe = val === '' ? null : Number(val); insp.tiefeQuelle = 'gemessen'; changed(false); }, { unit: 'm' }), h('span', { class: 'unit' }, 'm')),
           insp.tiefeQuelle === 'stamm' ? `aus Stammdaten${manhole.tiefe != null ? ' (' + fmtM(manhole.tiefe) + ')' : ''} – bei Abweichung gemessenen Wert eintragen`
             : insp.tiefeQuelle === 'foto' ? 'aus Foto geschätzt – bitte nachmessen' : insp.tiefeQuelle === 'gemessen' ? 'gemessen' : null),
           field('Vertikaler Bezugspunkt', select(insp.bezugVertikal, REF.U115, (val) => { insp.bezugVertikal = val; changed(); }),
             'Standard nach BFR Abwasser: Sohle der tiefsten abgehenden Leitung = 0,00 m. Eingaben „ab Deckel“ werden automatisch umgerechnet.'),
+          h('p', { class: 'muted small row' }, icon('info', 16), h('span', 'Laser mit Bluetooth-Tastaturmodus: Feld antippen, am Gerät messen – der Wert wird eingetragen (auch „2345 mm“ oder „2,345 m“), Enter springt weiter.')),
           h('div', { class: 'grid2' },
             field('Innenschutz', select(insp.innenschutz, [['', '–'], ...REF.G103], set('innenschutz'))),
             field('Auskleidung', select(insp.artAuskleidung, [['', '–'], ...REF.U114], set('artAuskleidung'))))),

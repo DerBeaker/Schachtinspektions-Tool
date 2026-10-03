@@ -1,9 +1,10 @@
-// Export: ISYBAU-Zustandsdaten (XML + Fotos als ZIP) und Projekt-Sicherung.
+// Export: ISYBAU-Zustandsdaten (2006–2024) oder DWA-M 150 (XML + Fotos als ZIP).
 
 import { h, clear, btn, icon, toast, field, select, toggle, badge, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
-import { getProject, listManholes, getSettings, saveSettings, getPhoto } from '../core/store.js';
-import { exportZustandsdaten, exportFileName } from '../isybau/export.js';
+import { getProject, saveProject, listManholes, getSettings, saveSettings, getPhoto } from '../core/store.js';
+import { exportZustandsdaten, exportFileName, EXPORT_FORMATS } from '../isybau/export.js';
+import { exportM150, m150FileName } from '../isybau/m150.js';
 import { validateInspection } from '../isybau/validate.js';
 import { zipParts } from '../lib/zip.js';
 import { download } from '../core/util.js';
@@ -13,7 +14,7 @@ export async function renderExport(view, projectId) {
   if (!project) { navigate('#/', { replace: true }); return; }
   const settings = await getSettings();
   const manholes = await listManholes(projectId);
-  const opts = { version: settings.exportVersion || '2017-07', scope: 'fertig', photos: true };
+  const opts = { version: project.exportFormat || settings.exportVersion || '2017-07', scope: 'fertig', photos: true };
   const main = h('main', { class: 'main' });
   const listEl = h('div', { class: 'list' });
   const summary = h('div');
@@ -31,19 +32,21 @@ export async function renderExport(view, projectId) {
         h('div', { class: 'grow' }, h('b', m.name), h('div', { class: 'meta' }, h('span', `${m.inspection.findings.length} Befunde`), h('span', `${m.inspection.connections.length} Anschlüsse`))),
         v.errors ? badge(`${v.errors} Fehler`, 'err') : v.warnings ? badge(`${v.warnings} Hinweise`, 'warn') : badge('ok', 'ok'));
     }));
-    clear(summary, h('div', { class: 'card card-pad row' },
-      h('div', { class: 'item-icon' }, icon('file')),
-      h('div', { class: 'grow' },
-        h('h3', `${items.length} von ${manholes.length} Schächten im Export`),
-        h('div', { class: 'muted small' }, errs ? `${errs} Inspektion(en) mit Fehlern – bitte vor der Abgabe prüfen.` : 'Alle enthaltenen Inspektionen sind plausibel.')),
-      btn('Exportieren', { icon: 'download', variant: 'primary', disabled: !items.length, onClick: doExport })));
+    clear(summary, h('div', { class: 'card card-pad stack' },
+      h('div', { class: 'row' },
+        h('div', { class: 'item-icon' }, icon('file')),
+        h('div', { class: 'grow' },
+          h('h3', `${items.length} von ${manholes.length} Schächten im Export`),
+          h('div', { class: 'muted small' }, errs ? `${errs} Inspektion(en) mit Fehlern – bitte vor der Abgabe prüfen.` : 'Alle enthaltenen Inspektionen sind plausibel.'))),
+      btn('Exportieren', { icon: 'download', variant: 'primary', block: true, disabled: !items.length, onClick: doExport })));
   }
 
   async function doExport() {
     const items = candidates().map((m) => ({ inspection: m.inspection, manhole: m }));
     try {
-      const out = exportZustandsdaten({ project, items, settings, version: opts.version });
-      const base = exportFileName(project, opts.version);
+      const m150 = opts.version === 'm150';
+      const out = m150 ? exportM150({ project, items, settings }) : exportZustandsdaten({ project, items, settings, version: opts.version });
+      const base = m150 ? m150FileName(project) : exportFileName(project, opts.version);
       if (window.SB_DEMO) { showXml(out, base); return; }
       if (!opts.photos) {
         download([out.bytes], `${base}.xml`, 'application/xml');
@@ -66,6 +69,7 @@ export async function renderExport(view, projectId) {
       toast(`Export erstellt: ${items.length} Schächte, ${out.photos.length} Fotos.`, 'ok', 4500);
       settings.exportVersion = opts.version;
       await saveSettings(settings);
+      if (project.exportFormat !== opts.version) { project.exportFormat = opts.version; await saveProject(project); }
     } catch (e) {
       console.error(e);
       toast('Export fehlgeschlagen: ' + e.message, 'error', 6000);
@@ -85,14 +89,26 @@ export async function renderExport(view, projectId) {
     });
   }
 
-  clear(view, topbar({ back: `#/p/${projectId}`, title: 'ISYBAU-Export', sub: project.name }), main);
+  const hint = h('p', { class: 'muted small' });
+  const kod = project.kodiersystem === '9' ? 'DIN EN 13508-2 / DWA-M 149-2' : 'DIN EN 13508-2 / ISYBAU (BFR Abwasser)';
+  const renderHint = () => {
+    const v = opts.version;
+    const txt = v === 'm150'
+      ? `DWA-M 150, Typ B (Stand 04-2010): je Schacht Stammdaten (KG), Inspektion (KI) und Zustände (KZ), Dezimalkomma, ISO-8859-1 – aufgebaut wie das offizielle DWA-Beispiel. Kodiersystem: ${project.kodiersystem === '9' ? 'DWAM149-2:2013' : 'EN13508'}. Vor dem ersten Projekt bitte mit der Software des Auftraggebers gegenprüfen.`
+      : `Kodiersystem: ${kod}. Die XML-Datei entspricht dem offiziellen XSD-Schema ${v.slice(0, 4)} (automatisch geprüft).`
+        + (v === '2006-10' ? ' XML-2006 kennt nur DIN EN 13508-2:2003 – gekennzeichnet als „Nationale Festlegung DWA-M 149-2“ (Wert 2).' : '')
+        + (v < '2017' ? ` Pflichtangabe Liegenschaft: ${project.liegenschaftNummer || project.auftragNummer || '0'} / ${project.liegenschaftBezeichnung || project.name} (änderbar unter Projekt & Auftrag).` : '');
+    clear(hint, txt + ' Fotodateien „Schacht-001.jpg“.');
+  };
+  clear(view, topbar({ back: `#/p/${projectId}`, title: 'Export', sub: project.name }), main);
   main.append(h('div', { class: 'layout-2' },
     h('div', { class: 'card card-pad stack' },
       h('h3', 'Einstellungen'),
-      field('Format', select(opts.version, [['2017-07', 'ISYBAU XML-2017 (weit verbreitet)'], ['2024-06', 'ISYBAU XML-2024 (BFR Abwasser 01/2025)']], (v) => { opts.version = v; })),
+      field('Format', select(opts.version, EXPORT_FORMATS, (v) => { opts.version = v; renderHint(); }), 'Wird pro Projekt gemerkt.'),
       field('Umfang', select(opts.scope, [['fertig', 'nur abgeschlossene Schächte'], ['alle', 'alle begonnenen Inspektionen']], (v) => { opts.scope = v; renderList(); })),
       toggle(opts.photos, (v) => { opts.photos = v; }, 'Fotos mitliefern (ZIP mit Ordner „Fotos“)'),
-      h('p', { class: 'muted small' }, `Kodiersystem: ${project.kodiersystem === '9' ? 'DIN EN 13508-2 / DWA-M 149-2' : 'DIN EN 13508-2 / ISYBAU (BFR Abwasser)'} · Fotodateien nach BFR-Konvention „Schacht-001.jpg“. Die XML-Datei ist gegen das offizielle XSD-Schema geprüft.`)),
+      hint),
     h('div', { class: 'stack' }, summary, listEl)));
+  renderHint();
   renderList();
 }

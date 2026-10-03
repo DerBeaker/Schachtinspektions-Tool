@@ -5,6 +5,7 @@ import { navigate, topbar } from '../core/shell.js';
 import { listProjects, createProject, importIntoProject, getSettings } from '../core/store.js';
 import { fmtRelative, readFile } from '../core/util.js';
 import { pickFile } from '../lib/image.js';
+import { formatLabel } from '../isybau/export.js';
 
 export async function renderProjects(view) {
   const settings = await getSettings();
@@ -24,7 +25,7 @@ export async function renderProjects(view) {
       h('h2', hello),
       h('p', projects.length
         ? `${totals.offen} Schächte offen, ${totals.fertig} fertig inspiziert.`
-        : 'Stammdaten (ISYBAU-XML) importieren, Schacht von oben fotografieren, kodieren und als ISYBAU-Zustandsdaten exportieren.'),
+        : 'Stammdaten (ISYBAU-XML oder DWA-M 150) importieren, Schacht von oben fotografieren, kodieren und als ISYBAU- oder DWA-M-150-Datei abgeben.'),
       h('div', { class: 'row wrap', style: { marginTop: '14px' } },
         btn('Stammdaten importieren', { icon: 'upload', variant: 'primary', onClick: () => importFlow() }),
         !projects.length ? btn('Demo ansehen', { icon: 'sparkles', onClick: loadDemo }) : null)),
@@ -36,7 +37,7 @@ export async function renderProjects(view) {
   }
   if (!projects.length) {
     main.append(h('div', { class: 'card', style: { marginTop: '16px' } },
-      empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere ISYBAU-Stammdaten. Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
+      empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere Stammdaten (ISYBAU oder DWA-M 150). Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
         btn('Leeres Projekt', { icon: 'plus', variant: 'soft', onClick: newProjectSheet }))));
     if (!settings.inspector) main.append(firstRunHint());
     return;
@@ -49,7 +50,7 @@ export async function renderProjects(view) {
       h('div', { class: 'item-icon' }, icon('folder')),
       h('div', { class: 'grow' },
         h('div', { class: 'row between' }, h('h3', { class: 'ellipsis' }, p.name), h('span', { class: 'badge' }, `${p.stats.fertig}/${p.stats.total}`)),
-        h('div', { class: 'meta' }, p.ort ? h('span', p.ort) : null, h('span', p.kodiersystem === '9' ? 'DWA-M 149-2' : 'ISYBAU'), h('span', fmtRelative(p.updatedAt))),
+        h('div', { class: 'meta' }, p.ort ? h('span', p.ort) : null, h('span', p.kodiersystem === '9' ? 'DWA-M 149-2' : 'BFR/ISYBAU'), p.exportFormat ? h('span', formatLabel(p.exportFormat)) : null, h('span', fmtRelative(p.updatedAt))),
         h('div', { class: 'progress' }, h('span', { style: { width: pct + '%' } }))),
       icon('chevron', 20));
   })));
@@ -66,7 +67,7 @@ function heroArt() {
 function firstRunHint() {
   return h('div', { class: 'card card-pad row', style: { marginTop: '12px' } },
     h('div', { class: 'item-icon' }, icon('user')),
-    h('div', { class: 'grow' }, h('h3', 'Tipp: Name & Firma hinterlegen'), h('p', { class: 'muted small' }, 'Wird automatisch in jede Inspektion und den ISYBAU-Export übernommen.')),
+    h('div', { class: 'grow' }, h('h3', 'Tipp: Name & Firma hinterlegen'), h('p', { class: 'muted small' }, 'Wird automatisch in jede Inspektion und den Export übernommen.')),
     btn('Einstellungen', { small: true, onClick: () => navigate('#/settings') }));
 }
 
@@ -76,7 +77,7 @@ function newProjectSheet() {
     title: 'Neues Projekt',
     body: h('div', { class: 'stack' },
       h('div', { class: 'menu' },
-        h('button', { class: 'menu-item', onclick: () => { s.close(); importFlow(); } }, icon('upload'), h('div', null, h('div', 'ISYBAU-Stammdaten importieren'), h('div', { class: 'muted small' }, 'XML-Datei (2006 bis 2024) – Schächte, Tiefen, Anschlüsse'))),
+        h('button', { class: 'menu-item', onclick: () => { s.close(); importFlow(); } }, icon('upload'), h('div', null, h('div', 'Stammdaten importieren'), h('div', { class: 'muted small' }, 'ISYBAU-XML (2006 bis 2024) oder DWA-M 150 – Schächte, Tiefen, Anschlüsse'))),
         h('button', { class: 'menu-item', onclick: () => { s.close(); loadDemo(); } }, icon('sparkles'), h('div', null, h('div', 'Demo-Projekt laden'), h('div', { class: 'muted small' }, 'Fiktive Straße mit 8 Schächten zum Ausprobieren')))),
       h('div', { class: 'section-title' }, 'oder leeres Projekt'),
       field('Projektname', input('', (v) => (data.name = v), { placeholder: 'z. B. Kaserne Nord, BA 3' })),
@@ -96,7 +97,7 @@ export async function importFlow(projectId) {
   try {
     const buf = await readFile(file);
     const r = await importIntoProject(buf, { projectId, fileName: file.name });
-    toast(`${r.added} Schächte importiert${r.updated ? `, ${r.updated} aktualisiert` : ''} (ISYBAU ${r.version || '?'}).`, 'ok', 4500);
+    toast(`${r.added} Schächte importiert${r.updated ? `, ${r.updated} aktualisiert` : ''} (${r.format === 'm150' ? r.version : `ISYBAU ${r.version || '?'}`}).`, 'ok', 4500);
     for (const w of r.warnings) toast(w, 'info', 5000);
     if (projectId) window.dispatchEvent(new Event('app:route'));
     else navigate(`#/p/${r.project.id}`);

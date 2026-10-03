@@ -21,7 +21,7 @@ export function lageInput(insp, mode, value, onChange, { label = 'Vertikale Lage
     out.textContent = v === '' ? 'Abstand in Metern, z. B. 1,25'
       : `= ${fmtNum(d.oben)} m unter OK Deckel · ${fmtNum(d.unten)} m über Sohle (Auslauf)`;
   };
-  const inp = numInput(v, (val) => { v = val; upd(); onChange(m, v); }, { placeholder: '0,00' });
+  const inp = numInput(v, (val) => { v = val; upd(); onChange(m, v); }, { placeholder: '0,00', unit: 'm' });
   upd();
   return h('div', { class: 'field' },
     h('span', { class: 'field-label' }, label),
@@ -105,7 +105,7 @@ export function openFindingEditor({ insp, project, finding, onSave, onDelete, pr
       if (!q1) f.q1 = '';
       if (!q2) f.q2 = '';
       const qf = (q, key) => field(`${q.label}${q.req ? '' : ' (optional)'}`,
-        h('div', { class: 'input-unit' }, numInput(f[key], (v) => { f[key] = v; refresh(); }, { placeholder: q.dec ? '0,0' : '0' }), h('span', { class: 'unit' }, q.unit)));
+        h('div', { class: 'input-unit' }, numInput(f[key], (v) => { f[key] = v; refresh(); }, { placeholder: q.dec ? '0,0' : '0', unit: q.unit === 'mm' || q.unit === 'm' ? q.unit : undefined }), h('span', { class: 'unit' }, q.unit)));
       clear(qBox, q1 || q2 ? h('div', { class: 'grid2' }, q1 ? qf(q1, 'q1') : null, q2 ? qf(q2, 'q2') : null) : null);
     };
     const renderStrecke = () => clear(streckeBox, f.strecke
@@ -224,8 +224,8 @@ export function openConnectionEditor({ insp, conn, onSave, onDelete }) {
     c.pipeName ? h('div', { class: 'muted small' }, `Stammdaten: ${c.pipeName}${c.nachbar ? ' ↔ ' + c.nachbar : ''}${c.material ? ' · ' + c.material : ''}`) : null,
     field('Lage am Umfang', clockPicker({ from: c.clock, to: null }, (v) => { c.clock = v.from; c.clockSet = true; refresh(); }, { allowRange: false })),
     h('div', { class: 'grid2' },
-      field('Nennweite / Höhe', h('div', { class: 'input-unit' }, numInput(c.dn, (v) => { c.dn = v; refresh(); }, { placeholder: '300' }), h('span', { class: 'unit' }, 'mm'))),
-      field('Breite (falls ≠)', h('div', { class: 'input-unit' }, numInput(c.dnB, (v) => { c.dnB = v; }), h('span', { class: 'unit' }, 'mm')))),
+      field('Nennweite / Höhe', h('div', { class: 'input-unit' }, numInput(c.dn, (v) => { c.dn = v; refresh(); }, { placeholder: '300', unit: 'mm' }), h('span', { class: 'unit' }, 'mm'))),
+      field('Breite (falls ≠)', h('div', { class: 'input-unit' }, numInput(c.dnB, (v) => { c.dnB = v; }, { unit: 'mm' }), h('span', { class: 'unit' }, 'mm')))),
     field('Querschnitt (DCG)', select(c.form, c1Options('DCG').map((o) => [o.k, `${o.k} – ${o.t}`]), (v) => { c.form = v; })),
     field('Art des Anschlusses (DCA)', select(c.dca, c1Options('DCA').map((o) => [o.k, `${o.k} – ${o.t}`]), (v) => { c.dca = v; renderC2(); })),
     dcaC2Box,

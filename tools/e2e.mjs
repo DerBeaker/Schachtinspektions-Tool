@@ -75,7 +75,10 @@ await page.locator('.sheet input[type=search]').fill('Steig');
 await page.locator('.sheet .code-row', { hasText: 'DAQ' }).click();
 await page.locator('.sheet .pill', { hasText: 'korrodiertes Steigeisen' }).click();
 await page.locator('.sheet').getByPlaceholder('0', { exact: true }).fill('4');
-await page.locator('.sheet').getByPlaceholder('0,00').first().fill('0,5');
+// wie ein Laser im Bluetooth-Tastaturmodus: Wert mit Einheit + Enter
+await page.locator('.sheet').getByPlaceholder('0,00').first().fill('500 mm');
+await page.locator('.sheet').getByPlaceholder('0,00').first().press('Enter');
+if (await page.locator('.sheet').getByPlaceholder('0,00').first().inputValue() !== '0,5') errors.push('Laser-Eingabe „500 mm“ wurde nicht zu 0,5 m');
 await page.locator('.sheet .toggle', { hasText: 'Streckenfeststellung' }).click();
 await page.locator('.sheet').getByPlaceholder('0,00').nth(1).fill('1,8');
 await page.locator('.sheet .shaft .pill', { hasText: 'Schachtaufbau' }).click();
@@ -96,21 +99,40 @@ await shot('11-projekt-nach-abschluss');
 
 step('Export');
 await page.getByRole('button', { name: 'Export', exact: true }).click();
-await page.getByText('ISYBAU-Export').first().waitFor();
+await page.getByRole('button', { name: 'Exportieren' }).waitFor();
 await shot('12-export');
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportieren' }).click()]);
-const zipPath = `${outDir}/${dl.suggestedFilename()}`;
-await dl.saveAs(zipPath);
-console.log('  Download:', zipPath);
+const { readFileSync } = await import('node:fs');
+async function exportAs(format) {
+  if (format) await page.locator('main select').first().selectOption(format);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportieren' }).click()]);
+  const p = `${outDir}/${dl.suggestedFilename()}`;
+  await dl.saveAs(p);
+  console.log('  Download:', p);
+  return readFileSync(p).toString('latin1');
+}
 {
-  const { readFileSync } = await import('node:fs');
-  const z = readFileSync(zipPath).toString('latin1');
+  const z = await exportAs();
   const expect = (re, msg) => { if (!re.test(z)) errors.push('Export: ' + msg); };
   expect(/<InspektionsKode>DAB<\/InspektionsKode>\s*<Charakterisierung1>B<\/Charakterisierung1>\s*<Charakterisierung2>A<\/Charakterisierung2>\s*<Verbindung>0<\/Verbindung>\s*<Quantifizierung1Numerisch>0\.80<\/Quantifizierung1Numerisch>\s*<Schachtbereich>C<\/Schachtbereich>\s*<PositionVon>03<\/PositionVon>/, 'DABBA 0,8 mm Bereich C 3 Uhr fehlt');
   expect(/<VertikaleLage>1\.52<\/VertikaleLage>\s*<InspektionsKode>DAB</, 'DAB-Lage 0,90 m ab Deckel -> 1,52 m über Sohle');
   expect(/<InspektionsKode>DAQ<\/InspektionsKode>\s*<Charakterisierung1>C<\/Charakterisierung1>[\s\S]*?<Streckenschaden>A<\/Streckenschaden>/, 'DAQC Strecke A fehlt');
   expect(/<InspektionsKode>DAQ<\/InspektionsKode>[\s\S]*?<Streckenschaden>B<\/Streckenschaden>/, 'DAQ Strecke B fehlt');
   expect(/<Fotodatei>S1005-001\.jpg<\/Fotodatei>/, 'Fotoreferenz fehlt');
+  expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
+  expect(/<VertikaleLage>1\.92<\/VertikaleLage>\s*<InspektionsKode>DAQ</, 'DAQ-Ende per Laser 500 mm ab Deckel -> 1,92 m');
+}
+{
+  const z = await exportAs('2006-10');
+  if (!/xmlns="http:\/\/www\.ofd-hannover\.la\/Identifikation"/.test(z) || !/<Version>2006-10<\/Version>/.test(z) || /<Index>/.test(z)) errors.push('Export 2006: Namespace/Version/Index falsch');
+}
+{
+  const z = await exportAs('m150');
+  await shot('12b-export-m150');
+  const expect = (re, msg) => { if (!re.test(z)) errors.push('M150: ' + msg); };
+  expect(/<DATA>\s*<FD>\s*<FD001>04-2010<\/FD001>\s*<FD002>B<\/FD002>/, 'Kopf FD fehlt');
+  expect(/<KG001>S1005<\/KG001>/, 'Knoten S1005 fehlt');
+  expect(/<KZ001>1,52<\/KZ001>\s*<KZ002>DAB<\/KZ002>\s*<KZ014>B<\/KZ014>\s*<KZ015>A<\/KZ015>\s*<KZ003>0,8<\/KZ003>/, 'DAB mit Dezimalkomma fehlt');
+  expect(/<KZ005>A1<\/KZ005>/, 'Streckenschaden A1 fehlt');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
 }
 

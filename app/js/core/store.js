@@ -100,15 +100,21 @@ export async function importIntoProject(buffer, { projectId, fileName } = {}) {
   let project = projectId ? await getProject(projectId) : null;
   if (!project) {
     project = await createProject({
-      name: data.liegenschaft || (fileName || 'ISYBAU-Import').replace(/\.xml$/i, ''),
+      name: data.liegenschaft || (fileName || 'Stammdaten-Import').replace(/\.xml$/i, ''),
       ort: data.manholes[0]?.ortsteil || '',
       crsLage: data.crsLage, crsHoehe: data.crsHoehe, stammdatenDatei: fileName || '',
     });
+    // Abgabe standardmäßig im Format der gelieferten Stammdaten
+    if (data.format === 'm150') project.exportFormat = 'm150';
+    else if (['2006-10', '2013-02', '2017-07', '2024-06'].includes(data.version)) project.exportFormat = data.version;
   } else {
     project.crsLage = data.crsLage || project.crsLage;
     project.crsHoehe = data.crsHoehe || project.crsHoehe;
     project.stammdatenDatei = fileName || project.stammdatenDatei;
-    await saveProject(project);
+  }
+  if (data.liegenschaftDaten) {
+    project.liegenschaftNummer ||= data.liegenschaftDaten.nummer;
+    project.liegenschaftBezeichnung ||= data.liegenschaftDaten.bezeichnung;
   }
   const existing = await db.byIndex('manholes', 'projectId', project.id);
   const byName = new Map(existing.filter((m) => !m.deleted).map((m) => [m.name, m]));
@@ -117,11 +123,11 @@ export async function importIntoProject(buffer, { projectId, fileName } = {}) {
     const old = byName.get(m.name);
     if (old) updated++; else added++;
     const wgs = m.x != null ? toWgs84(m.x, m.y, m.crs || data.crsLage) : null;
-    return touch({ ...(old || {}), ...m, id: old?.id || uid(), projectId: project.id, source: 'isybau', wgs, createdAt: old?.createdAt || Date.now() });
+    return touch({ ...(old || {}), ...m, id: old?.id || uid(), projectId: project.id, source: data.format || 'isybau', wgs, createdAt: old?.createdAt || Date.now() });
   });
   await db.putMany('manholes', recs);
   await saveProject(project);
-  return { project, added, updated, warnings: data.warnings, version: data.version };
+  return { project, added, updated, warnings: data.warnings, version: data.version, format: data.format };
 }
 
 // ---- Schächte --------------------------------------------------------------

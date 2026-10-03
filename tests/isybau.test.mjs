@@ -123,21 +123,31 @@ test('Export: Struktur, Fotonamen, Kodierung', () => {
 });
 
 const xsd = {
+  '2006-10': join(root, '.cache/isybau-xsd/2006/0610-metadaten.xsd'),
+  '2013-02': join(root, '.cache/isybau-xsd/2013/1302-metadaten.xsd'),
   '2017-07': join(root, '.cache/isybau-xsd/2017/1707-metadaten.xsd'),
   '2024-06': join(root, '.cache/isybau-xsd/2024/2406-metadaten.xsd'),
 };
 const hasXmllint = (() => { try { execFileSync('xmllint', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
 
 for (const version of Object.keys(xsd)) {
-  test(`Export ${version} ist gültig gegen das offizielle XSD`, { skip: !hasXmllint || !existsSync(xsd[version]) ? 'XSD nicht vorhanden (tools/fetch-isybau-xsd.sh)' : false }, () => {
-    const { project, items } = sampleProject();
-    const out = exportZustandsdaten({ project, items, settings: { company: 'Test GmbH' }, version });
-    const dir = mkdtempSync(join(tmpdir(), 'isy-'));
-    const f = join(dir, 'export.xml');
-    writeFileSync(f, out.bytes);
-    execFileSync('xmllint', ['--noout', '--schema', xsd[version], f], { stdio: 'pipe' });
-    if (version >= '2024') assert.ok(Buffer.from(out.bytes).toString('latin1').includes('<Erfassungsart>3</Erfassungsart>'));
-  });
+  for (const kodiersystem of ['10', '9']) {
+    test(`Export ${version} (Kodiersystem ${kodiersystem}) ist gültig gegen das offizielle XSD`, { skip: !hasXmllint || !existsSync(xsd[version]) ? 'XSD nicht vorhanden (npm run xsd)' : false }, () => {
+      const { project, items } = sampleProject();
+      project.kodiersystem = kodiersystem;
+      items[0].inspection.findings.push({ id: id(), code: 'DDE', c1: 'A', bereich: 'J', lageMode: 'unten', lageValue: 0.2, drainage: true });
+      const out = exportZustandsdaten({ project, items, settings: { company: 'Test GmbH' }, version });
+      const dir = mkdtempSync(join(tmpdir(), 'isy-'));
+      const f = join(dir, 'export.xml');
+      writeFileSync(f, out.bytes);
+      execFileSync('xmllint', ['--noout', '--schema', xsd[version], f], { stdio: 'pipe' });
+      const s = Buffer.from(out.bytes).toString('latin1');
+      assert.equal(s.includes('<Erfassungsart>3</Erfassungsart>'), version >= '2024');
+      assert.equal(s.includes('<Index>'), version >= '2017');
+      assert.equal(s.includes('<Liegenschaft>'), version < '2017');
+      assert.match(s, new RegExp(`<Kodiersystem>${version < '2013' ? '2' : kodiersystem}</Kodiersystem>`));
+    });
+  }
 }
 
 test('Demo-Stammdaten sind gültig gegen das XSD', { skip: !hasXmllint || !existsSync(xsd['2017-07']) }, () => {
@@ -197,4 +207,16 @@ test('Koordinaten: UTM und Gauß-Krüger nach WGS84', () => {
   assert.ok(Math.abs(p.lat - 52.35029) < 1e-4); // Referenz: Krüger-Reihen
   const g = toWgs84(3500000, 5800000, '');
   assert.ok(Math.abs(g.lon - 9) < 0.01 && Math.abs(g.lat - 52.333) < 0.01);
+});
+
+test('Messwerte von Tastatur/Laser: Dezimalkomma, Einheiten', async () => {
+  const { parseMeasure } = await import('../app/js/core/util.js');
+  assert.equal(parseMeasure('2,345', 'm'), '2.345');
+  assert.equal(parseMeasure('2.345 m', 'm'), '2.345');
+  assert.equal(parseMeasure('2345mm', 'm'), '2.345');
+  assert.equal(parseMeasure('234,5 cm', 'm'), '2.345');
+  assert.equal(parseMeasure('0,95 m', 'mm'), '950');
+  assert.equal(parseMeasure('300', 'mm'), '300');
+  assert.equal(parseMeasure('', 'm'), '');
+  assert.equal(parseMeasure('abc', 'm'), null);
 });

@@ -1,5 +1,5 @@
 // Service Worker: macht die App offline-fähig (App-Dateien im Cache, API nie cachen).
-const VERSION = 'schachtblick-v1';
+const VERSION = 'schachtblick-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
@@ -7,7 +7,7 @@ const ASSETS = [
   './js/main.js', './js/sync.js',
   './js/core/db.js', './js/core/shell.js', './js/core/store.js', './js/core/ui.js', './js/core/util.js',
   './js/data/codes.js', './js/data/reflists.js',
-  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js',
+  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js', './js/isybau/m150.js',
   './js/lib/geo.js', './js/lib/zip.js', './js/lib/image.js', './js/lib/depth.js',
   './js/components/clockpicker.js', './js/components/photoview.js', './js/components/shaft.js',
   './js/views/projects.js', './js/views/project.js', './js/views/inspection.js', './js/views/editors.js',

@@ -1,12 +1,52 @@
-// Export von Schachtinspektionen als ISYBAU-Zustandsdaten (XML-2017 oder XML-2024).
+// Export von Schachtinspektionen als ISYBAU-Zustandsdaten (XML-2006, -2013, -2017, -2024).
 
 import { XmlWriter, esc, encodeLatin1 } from './xml.js';
 import { buildRecords, KZUSTAND_ORDER } from './model.js';
 
 export const APP_NAME = 'Schachtblick';
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 
-const NS = 'http://www.bfr-abwasser.de';
+const NS_OFD = 'http://www.ofd-hannover.la/Identifikation';
+const NS_BFR = 'http://www.bfr-abwasser.de';
+
+/**
+ * Unterschiede der Schema-Versionen für Zustandsdaten von Schächten.
+ * kodiersystem: Projektwert ('10' BFR Abwasser, '9' DWA-M 149-2, beide DIN EN 13508-2:2011)
+ * auf die Referenzliste U102 der Version abbilden. 2006 kennt nur die Ausgabe 2003
+ * (wie in den offiziellen 2006er-Beispieldaten: 2 = Nationale Festlegung DWA-M 149-2).
+ */
+export const ISYBAU_VERSIONS = {
+  '2006-10': {
+    label: 'ISYBAU XML-2006', ns: NS_OFD, regelwerk: '2', liegenschaft: true,
+    omit: ['Index', 'Parameter', 'Gruppe', 'DDEZulaufDrainage', 'Erfassungsart'],
+    kodiersystem: () => '2',
+  },
+  '2013-02': {
+    label: 'ISYBAU XML-2013', ns: NS_OFD, regelwerk: '5', liegenschaft: true, crsInAdmin: true,
+    omit: ['Index', 'DDEZulaufDrainage', 'Erfassungsart'],
+    kodiersystem: (k) => k,
+  },
+  '2017-07': {
+    label: 'ISYBAU XML-2017', ns: NS_BFR, regelwerk: '6', crsInAdmin: true,
+    omit: ['Erfassungsart'],
+    kodiersystem: (k) => k,
+  },
+  '2024-06': {
+    label: 'ISYBAU XML-2024', ns: NS_BFR, regelwerk: '7', crsInAdmin: true, profilmass: true,
+    omit: [],
+    kodiersystem: (k) => k,
+  },
+};
+
+/** Abgabeformate für die Auswahl in der App. */
+export const EXPORT_FORMATS = [
+  ['2006-10', 'ISYBAU XML-2006'],
+  ['2013-02', 'ISYBAU XML-2013'],
+  ['2017-07', 'ISYBAU XML-2017'],
+  ['2024-06', 'ISYBAU XML-2024'],
+  ['m150', 'DWA-M 150 (XML, Typ B)'],
+];
+export const formatLabel = (f) => (EXPORT_FORMATS.find(([k]) => k === f) || [, f])[1];
 
 const ordered = (rec, order) => order.filter((k) => rec[k] != null && rec[k] !== '').map((k) => [k, rec[k]]);
 
@@ -29,17 +69,19 @@ export function photoNamer(objekt) {
  * @param {object} p.project   Projekt (Auftragsdaten)
  * @param {Array}  p.items     [{inspection, manhole}]
  * @param {object} p.settings  {company}
- * @param {string} p.version   '2017-07' | '2024-06'
+ * @param {string} p.version   '2006-10' | '2013-02' | '2017-07' | '2024-06'
  * @returns {{xml:string, bytes:Uint8Array, photos:Array<{id,file}>, count:number}}
  */
 export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date() }) {
+  const profile = ISYBAU_VERSIONS[version];
+  if (!profile) throw new Error(`Unbekannte ISYBAU-Version ${version}`);
   const isoDate = (d) => d.toISOString().slice(0, 10);
   const photos = [];
   const w = new XmlWriter();
   const kennung = 'ZUS01';
   const auftragKennung = String(project.auftragKennung || 1);
   const dates = items.map((i) => i.inspection.datum).filter(Boolean).sort();
-  const regelwerk = version >= '2024' ? '7' : '6';
+  const order = KZUSTAND_ORDER.filter((k) => !profile.omit.includes(k));
 
   const anlagen = items.map(({ inspection: insp, manhole }) => {
     const namer = photoNamer(manhole.name);
@@ -76,7 +118,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
             ['Innenschutz', insp.innenschutz || null],
             ['ArtAuskleidung', insp.artAuskleidung || null],
           ]],
-          ['Inspektionsdaten', records.map((r) => ['KZustand', ordered(r, KZUSTAND_ORDER)])],
+          ['Inspektionsdaten', records.map((r) => ['KZustand', ordered(r, order)])],
         ]],
       ]],
     ]];
@@ -90,7 +132,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
     ['Auftragsart', '1'],
     ['Inspektionsort', project.ort || null],
     ['Inspektionszweck', project.zweck || '2'],
-    ['Kodiersystem', project.kodiersystem || '10'],
+    ['Kodiersystem', profile.kodiersystem(project.kodiersystem || '10')],
     ['Auftragnehmer', (settings.company || '').slice(0, 60) || null],
     ['Systemname', APP_NAME],
     ['Version', APP_VERSION],
@@ -98,7 +140,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
   ]];
 
   const eig = [['Inspektion', '1'], ['Dichtheit', '0'], ['Film', '0']];
-  if (version >= '2024') eig.push(['Profilmasserfassung', '0']);
+  if (profile.profilmass) eig.push(['Profilmasserfassung', '0']);
 
   const body = [
     ['Datenkollektive', [
@@ -109,7 +151,7 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
         ['Kennung', kennung],
         ['Kollektivart', '2'],
         ['Kollektiveigenschaft', [['Zustandsdaten', eig]]],
-        ['Regelwerk', regelwerk],
+        ['Regelwerk', profile.regelwerk],
         ['Bearbeitungsstand', isoDate(today)],
       ]]]],
       ['Zustandsdatenkollektiv', [
@@ -121,15 +163,24 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
     ]],
   ];
 
-  const crs = project.crsHoehe ? [['Geometrie', [['CRSHoehe', project.crsHoehe]]]] : [];
+  const adminParts = [];
+  if (profile.liegenschaft) {
+    // 2006/2013: Liegenschaft ist Pflicht (Bundesliegenschaft; bei Kommunen z. B. Gemeinde/Projekt)
+    adminParts.push(['Liegenschaft', [
+      ['Liegenschaftsnummer', String(project.liegenschaftNummer || project.auftragNummer || '0').slice(0, 20)],
+      ['Liegenschaftsbezeichnung', String(project.liegenschaftBezeichnung || project.name || 'Schachtinspektion').slice(0, 40)],
+      ['Liegenschaftsort', (project.ort || '').slice(0, 40) || null],
+    ]]);
+  }
+  if (profile.crsInAdmin && project.crsHoehe) adminParts.push(['Geometrie', [['CRSHoehe', project.crsHoehe]]]);
   for (const [name, value] of body) w.el(name, value, 1);
   const admin = new XmlWriter();
-  for (const [name, value] of crs) admin.el(name, value, 2);
+  for (const [name, value] of adminParts) admin.el(name, value, 2);
   const adminXml = admin.out.length ? `  <Admindaten>\r\n${admin}\r\n  </Admindaten>` : '  <Admindaten/>';
 
   const xml = [
     '<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>',
-    `<Identifikation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="${esc(NS)}">`,
+    `<Identifikation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="${esc(profile.ns)}">`,
     `  <Version>${version}</Version>`,
     adminXml,
     w.toString(),

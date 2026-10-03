@@ -1,4 +1,5 @@
 // Kleine UI-Bibliothek: DOM-Builder, Icons, Bottom-Sheets, Toasts, Formularfelder.
+import { parseMeasure } from './util.js';
 
 export function h(tag, attrs, ...kids) {
   const el = tag === 'frag' ? document.createDocumentFragment() : document.createElement(tag);
@@ -200,13 +201,38 @@ export function input(value, onInput, attrs = {}) {
   return h('input', { class: 'input', value: value ?? '', oninput: (e) => onInput(e.target.value), ...attrs });
 }
 
-export function numInput(value, onInput, attrs = {}) {
+/** Fokus auf das nächste Eingabefeld im selben Dialog bzw. in derselben Ansicht. */
+function focusNext(el) {
+  const scope = el.closest('.sheet, form, .main') || document.body;
+  const list = [...scope.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([disabled]), select, textarea')]
+    .filter((x) => x.offsetParent !== null);
+  const next = list[list.indexOf(el) + 1];
+  if (next) next.focus(); else el.blur();
+}
+
+/**
+ * Zahleneingabe mit Dezimalkomma. `unit: 'm'|'mm'` erlaubt Werte mit Einheit (Laser);
+ * Enter übernimmt den Wert und springt ins nächste Feld.
+ */
+export function numInput(value, onInput, { unit, ...attrs } = {}) {
+  const show = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
   return h('input', {
-    class: 'input', type: 'text', inputmode: 'decimal', autocomplete: 'off',
-    value: value === null || value === undefined ? '' : String(value).replace('.', ','),
+    class: 'input', type: 'text', inputmode: 'decimal', autocomplete: 'off', enterkeyhint: 'next',
+    value: show(value),
     oninput: (e) => {
-      const raw = e.target.value.trim().replace(',', '.');
-      onInput(raw === '' ? '' : raw);
+      const v = parseMeasure(e.target.value, unit);
+      if (v !== null) onInput(v);
+    },
+    onchange: (e) => {
+      const v = parseMeasure(e.target.value, unit);
+      e.target.classList.toggle('invalid', v === null);
+      if (v !== null && v !== '') e.target.value = show(v);
+    },
+    onkeydown: (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      e.target.dispatchEvent(new Event('change'));
+      focusNext(e.target);
     },
     ...attrs,
   });
