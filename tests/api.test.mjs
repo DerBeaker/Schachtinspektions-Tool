@@ -15,11 +15,14 @@ const hasVendor = existsSync(join(root, 'app/api/vendor/autoload.php'));
 const skip = !hasSqlite ? 'PHP mit pdo_sqlite nicht vorhanden' : false;
 
 let php, mock, base, cfgPath, mailLog, mockReq = null;
-const PORT = 18000 + Math.floor(Math.random() * 1000);
-const MOCK_PORT = PORT + 1;
+// freie Ports vom Betriebssystem holen (keine Kollision mit anderen Testservern)
+const freePort = () => new Promise((res) => { const s = http.createServer().listen(0, () => { const { port } = s.address(); s.close(() => res(port)); }); });
+let PORT, MOCK_PORT;
 
 before(async () => {
   if (skip) return;
+  PORT = await freePort();
+  MOCK_PORT = await freePort();
   const dir = mkdtempSync(join(tmpdir(), 'sbapi-'));
   const cfg = join(dir, 'config.php');
   cfgPath = cfg;
@@ -55,8 +58,10 @@ before(async () => {
   }).listen(MOCK_PORT);
   php = spawn('php', ['-S', `127.0.0.1:${PORT}`, '-t', join(root, 'app')], { env: { ...process.env, SB_CONFIG: cfg }, stdio: 'ignore' });
   base = `http://127.0.0.1:${PORT}/api/`;
-  for (let i = 0; i < 50; i++) {
-    try { await fetch(base + '?r=ping'); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
+  // warten, bis der eigene PHP-Server antwortet (bis 15 s)
+  for (let i = 0; i < 150; i++) {
+    try { const r = await fetch(base + '?r=ping'); if (r.ok && (await r.json()).ok) break; } catch { /* startet noch */ }
+    await new Promise((r) => setTimeout(r, 100));
   }
 });
 

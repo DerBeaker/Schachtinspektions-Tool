@@ -60,6 +60,7 @@ async function init() {
   const s = await getSettings();
   if (s.theme) document.documentElement.dataset.theme = s.theme;
   await route();
+  window.__sbGestartet = true; // für die Startprüfung in index.html
   sync.init();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

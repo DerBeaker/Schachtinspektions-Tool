@@ -91,6 +91,13 @@ await chef.getByLabel('Kontakt').fill('Tel. 0123 456');
 await chef.waitForTimeout(1500); // Firmendaten werden verzögert an den Server gesendet
 await chef.screenshot({ path: `${outDir}/04-admin-firmendaten.png`, fullPage: true });
 
+step('Firmen-Admin: Demo-Projekt anlegen und synchronisieren');
+await chef.goto(url);
+await chef.getByRole('button', { name: 'Demo ansehen' }).click();
+await chef.getByText('S1005').first().waitFor();
+await chef.evaluate(async () => { const { sync } = await import('./js/sync.js'); await sync.run({ manual: true }); });
+await chef.goto(url + '#/settings');
+
 step('Firmen-Admin: Inspekteurin einladen');
 await chef.getByRole('button', { name: 'Benutzer verwalten' }).click();
 await chef.getByRole('button', { name: 'Per E-Mail einladen' }).click();
@@ -107,6 +114,9 @@ await mia.getByLabel('Passwort (mind. 8 Zeichen)').fill('mia-pass-12');
 await mia.getByLabel('Passwort wiederholen').fill('mia-pass-12');
 await mia.getByRole('button', { name: 'Zugang einrichten' }).click();
 await mia.getByRole('button', { name: 'Stammdaten importieren' }).waitFor();
+// Projekte der Firma erscheinen ohne manuelles Synchronisieren
+await mia.getByText('Demo: Musterweg').waitFor({ timeout: 15000 }).catch(() => errors.push('Projektliste nach Einladung nicht automatisch gefüllt'));
+await mia.screenshot({ path: `${outDir}/05a-inspekteurin-projekte.png` });
 await mia.goto(url + '#/settings');
 await mia.getByText('Wird vom Administrator Ihrer Firma gepflegt').waitFor();
 if (await mia.getByLabel('Anschrift').inputValue() !== 'Hauptstraße 1\n12345 Musterstadt') errors.push('Anschrift nicht übernommen');

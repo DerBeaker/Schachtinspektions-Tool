@@ -1,5 +1,5 @@
 // Service Worker: macht die App offline-fähig (App-Dateien im Cache, API nie cachen).
-const VERSION = 'schachtblick-v11';
+const VERSION = 'schachtblick-v12';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png', './icons/mmse-logo.png',
@@ -17,7 +17,8 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // „reload“: am HTTP-Cache vorbei, damit der Offline-Cache nur die neue Version enthält
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -28,9 +29,10 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/api/')) return;
-  // Netzwerk zuerst (immer aktuelle Version), bei Offline aus dem Cache
+  // Netzwerk zuerst (immer aktuelle Version, beim Server nachgefragt), bei Offline aus dem Cache
+  const req = e.request.mode === 'navigate' ? e.request : new Request(e.request, { cache: 'no-cache' });
   e.respondWith(
-    fetch(e.request)
+    fetch(req)
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); }
         return res;

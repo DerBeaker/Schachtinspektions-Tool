@@ -8,6 +8,7 @@ import { pickFile } from '../lib/image.js';
 import { formatLabel } from '../isybau/export.js';
 import { APP_NAME, VENDOR, VENDOR_URL, VENDOR_WEB } from '../brand.js';
 import { rechtsLinks } from './rechtliches.js';
+import { sync } from '../sync.js';
 
 const vendorLine = () => h('footer', { class: 'vendor-line muted small' },
   `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB), ' · ', rechtsLinks());
@@ -20,6 +21,17 @@ export async function renderProjects(view) {
     main);
 
   const projects = await listProjects();
+  // Nach dem Abgleich mit dem Server neu zeichnen (z. B. erste Anmeldung: die Liste füllt sich)
+  const neu = () => window.dispatchEvent(new Event('app:route'));
+  const leer = !projects.length;
+  let busy = sync.status.state === 'busy';
+  const unsub = sync.subscribe((st) => {
+    if (st.state === 'busy') busy = true;
+    else if (busy) { busy = false; if (leer) neu(); }
+  });
+  window.addEventListener('app:synced', neu);
+  const cleanup = () => { unsub(); window.removeEventListener('app:synced', neu); };
+
   if (projects.length) view.append(h('button', { class: 'fab', onclick: newProjectSheet, 'aria-label': 'Neues Projekt' }, icon('plus', 24), h('span', 'Projekt')));
   const totals = projects.reduce((a, p) => ({ total: a.total + p.stats.total, fertig: a.fertig + p.stats.fertig, offen: a.offen + p.stats.total - p.stats.fertig }), { total: 0, fertig: 0, offen: 0 });
 
@@ -41,12 +53,14 @@ export async function renderProjects(view) {
       h('span', 'Demo-Version: Daten bleiben nur in diesem Browser. Download, Druck, GPS und Team-Server gibt es in der installierten Version.')));
   }
   if (!projects.length) {
-    main.append(h('div', { class: 'card', style: { marginTop: '16px' } },
-      empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere Stammdaten (ISYBAU oder DWA-M 150). Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
-        btn('Leeres Projekt', { icon: 'plus', variant: 'soft', onClick: newProjectSheet }))));
+    main.append(sync.auth && busy
+      ? h('div', { class: 'card card-pad row', style: { marginTop: '16px' } }, icon('refresh', 20), h('span', 'Projekte werden vom Server geladen …'))
+      : h('div', { class: 'card', style: { marginTop: '16px' } },
+        empty('folder', 'Noch keine Projekte', 'Lege ein Projekt an oder importiere Stammdaten (ISYBAU oder DWA-M 150). Ohne Stammdaten kannst du Schächte auch manuell anlegen.',
+          btn('Leeres Projekt', { icon: 'plus', variant: 'soft', onClick: newProjectSheet }))));
     if (!settings.inspector) main.append(firstRunHint());
     main.append(vendorLine());
-    return;
+    return cleanup;
   }
 
   main.append(h('div', { class: 'section-title' }, 'Projekte'));
@@ -61,6 +75,7 @@ export async function renderProjects(view) {
       icon('chevron', 20));
   })));
   main.append(vendorLine());
+  return cleanup;
 }
 
 function heroArt() {

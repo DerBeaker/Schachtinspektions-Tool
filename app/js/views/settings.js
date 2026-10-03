@@ -35,6 +35,32 @@ export function linkSheet(r) {
   });
 }
 
+/** Test-E-Mail über den Server (nur Betreiber) – zeigt Versandweg und ggf. den Fehler. */
+export function mailTestDialog() {
+  const d = { email: sync.auth?.user?.email || '' };
+  const s = sheet({
+    title: 'E-Mail-Versand testen',
+    body: h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, 'Schickt eine Test-E-Mail über den Server. So sehen Sie, ob Einladungen und „Passwort vergessen“-Links ankommen – und falls nicht, warum.'),
+      field('An', input(d.email, (v) => { d.email = v; }, { type: 'email', autocapitalize: 'off', inputmode: 'email' }))),
+    actions: [btn('Test-E-Mail senden', { variant: 'primary', onClick: async () => {
+      try {
+        const r = await sync.opMailtest(d.email.trim());
+        s.close();
+        const weg = { smtp: 'SMTP', mail: 'PHP mail()', log: 'Logdatei', aus: 'ausgeschaltet' }[r.methode] || r.methode;
+        sheet({
+          title: r.ok ? 'Test-E-Mail verschickt' : 'Versand fehlgeschlagen',
+          body: h('div', { class: 'stack' },
+            h('p', null, r.ok ? `Die Test-E-Mail an ${r.to} wurde an den Mailserver übergeben. Bitte Posteingang (und Spam-Ordner) prüfen.` : `Die E-Mail an ${r.to} konnte nicht verschickt werden.`),
+            r.fehler ? h('div', { class: 'issue warn' }, icon('alert', 18), h('span', r.fehler)) : null,
+            h('p', { class: 'muted small' }, `Versand über: ${weg} · Absender: ${r.from}`),
+            r.ok && r.methode === 'smtp' ? null : h('p', { class: 'muted small' }, 'Zuverlässig bei IONOS: in api/config.php den Block „smtp“ mit einem Postfach der eigenen Domain eintragen (smtp.ionos.de, Port 465, Postfach-Adresse und -Passwort) – siehe config.sample.php und Installationsanleitung.')),
+        });
+      } catch (e) { toast(e.message, 'error', 5000); }
+    } })],
+  });
+}
+
 export async function renderSettings(view) {
   const s = await getSettings();
   const save = async () => { await saveSettings(s); };
@@ -65,6 +91,7 @@ export async function renderSettings(view) {
           btn('Jetzt synchronisieren', { icon: 'refresh', onClick: async () => { try { await sync.run({ manual: true }); toast('Synchronisiert.', 'ok'); } catch (e) { toast(e.message, 'error'); } renderServer(); } }),
           u.role === 'admin' ? btn('Benutzer verwalten', { icon: 'user', variant: 'soft', onClick: usersSheet }) : null,
           u.operator ? btn('Betreiber-Bereich', { icon: 'layers', variant: 'soft', onClick: () => navigate('#/betrieb') }) : null,
+          u.operator ? btn('E-Mail-Versand testen', { icon: 'upload', variant: 'ghost', onClick: mailTestDialog }) : null,
           btn('Passwort ändern', { variant: 'ghost', onClick: passwordSheet }),
           btn('Abmelden', { icon: 'logout', variant: 'ghost', onClick: async () => { await sync.logout(); renderServer(); } })));
       return;

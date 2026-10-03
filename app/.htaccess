@@ -3,8 +3,9 @@ AddType application/manifest+json .webmanifest
 AddType text/javascript .js .mjs
 AddDefaultCharset utf-8
 <IfModule mod_headers.c>
-  # Service Worker und Startseite nie zwischenspeichern, damit Updates sofort ankommen
-  <FilesMatch "^(sw\.js|index\.html)$">
+  # Programmdateien bei jedem Laden beim Server prüfen (304 = unverändert, sehr schnell),
+  # damit nach einem Update nie alte und neue Dateien gemischt werden
+  <FilesMatch "\.(html|js|mjs|css|webmanifest|json|xml)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
   Header always set X-Content-Type-Options "nosniff"

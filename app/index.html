@@ -18,9 +18,31 @@
 </head>
 <body>
   <div id="app">
-    <div style="display:grid;place-items:center;min-height:100vh;color:#5b6b80;font:16px system-ui">Schachtblick wird geladen …<br><small>MMSE Software Engineering · www.mmse-software.com</small></div>
+    <div id="sb-start" style="display:grid;place-items:center;min-height:100vh;color:#5b6b80;font:16px system-ui;text-align:center">Schachtblick wird geladen …<br><small>MMSE Software Engineering · www.mmse-software.com</small></div>
   </div>
   <noscript>Bitte JavaScript aktivieren – Schachtblick ist eine Web-App.</noscript>
+  <script>
+    // Startprüfung: Startet die App nicht (z. B. weil nach einem Update noch alte Dateien im Browser
+    // liegen), erscheint ein Knopf, der den Zwischenspeicher leert und neu lädt.
+    (function () {
+      function hilfe() {
+        var el = document.getElementById('sb-start');
+        if (window.__sbGestartet || !el || el.getAttribute('data-hilfe')) return;
+        el.setAttribute('data-hilfe', '1');
+        el.innerHTML = '<div style="max-width:420px;padding:20px">Schachtblick startet nicht richtig – meist liegt nach einem Update noch eine ältere Version im Browser.<br><br>'
+          + '<button id="sb-neu" style="font:600 16px system-ui;padding:12px 22px;border:0;border-radius:12px;background:#0a5bd3;color:#fff;cursor:pointer">Neu laden</button></div>';
+        document.getElementById('sb-neu').onclick = function () {
+          var p = [];
+          if (window.caches) p.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+          if (navigator.serviceWorker) p.push(navigator.serviceWorker.getRegistration().then(function (r) { return r && r.update(); }));
+          Promise.all(p).catch(function () {}).then(function () { setTimeout(function () { location.reload(); }, 300); });
+        };
+      }
+      window.addEventListener('error', function () { setTimeout(hilfe, 1500); });
+      window.addEventListener('unhandledrejection', function () { setTimeout(hilfe, 1500); });
+      setTimeout(hilfe, 12000);
+    })();
+  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
