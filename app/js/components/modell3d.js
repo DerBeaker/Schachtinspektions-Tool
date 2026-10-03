@@ -27,6 +27,65 @@ function anschlussHoehe(c, T) {
   return c.lageMode === 'oben' ? Math.max(0, T - v) : v;
 }
 
+// Draufsicht: Uhrzeit -> Richtung in der x/z-Ebene (12 Uhr = -z, 3 Uhr = +x)
+const richtung = (clock) => { const p = (Number(clock) % 12) * Math.PI / 6; return [Math.sin(p), -Math.cos(p)]; };
+
+/**
+ * Gerinne-Anschlüsse: Auslauf (Bezug, sonst erster Auslauf) und Hauptzulauf = tiefster Zulauf,
+ * bei gleicher Höhe (± 5 cm) der größte. Ohne Zulauf läuft das Gerinne gerade von gegenüber.
+ */
+export function gerinneAnschluesse(connections = [], T = 0) {
+  const mitUhr = connections.filter((c) => c.clock);
+  const aus = mitUhr.find((c) => c.dir === 'out' && c.isReference) || mitUhr.find((c) => c.dir === 'out');
+  const zu = mitUhr.filter((c) => c.dir === 'in');
+  let haupt = null;
+  if (zu.length) {
+    const tief = Math.min(...zu.map((c) => anschlussHoehe(c, T)));
+    haupt = zu.filter((c) => anschlussHoehe(c, T) <= tief + 0.05).sort((a, b) => (Number(b.dn) || 0) - (Number(a.dn) || 0))[0];
+  }
+  const uhrAus = aus ? Number(aus.clock) % 12 : 0;
+  let uhrZu = haupt ? Number(haupt.clock) % 12 : (uhrAus + 6) % 12;
+  if (uhrZu === uhrAus) uhrZu = (uhrAus + 6) % 12; // Zulauf genau am Auslauf: gerade durch
+  return { aus, haupt, uhrAus, uhrZu };
+}
+
+/**
+ * Verlauf des Gerinnes in der Draufsicht (ohne three.js, testbar): Achse als kubische Bézierkurve von
+ * der Wand beim Hauptzulauf zur Wand beim Auslauf (Hilfspunkte 30 % des Radius vor der Mitte – bei
+ * gegenüberliegenden Anschlüssen eine Gerade), dazu die Ränder links/rechts im Abstand `w` als
+ * Umriss der Berme. Punkte als [x, z]; liefert {achse, tangenten, links, rechts}.
+ */
+export function gerinneVerlauf({ uhrZu, uhrAus, rInnen, w, n = 48 }) {
+  const [ix, iz] = richtung(uhrZu);
+  const [ox, oz] = richtung(uhrAus);
+  const P = [[ix * rInnen, iz * rInnen], [ix * rInnen * 0.3, iz * rInnen * 0.3], [ox * rInnen * 0.3, oz * rInnen * 0.3], [ox * rInnen, oz * rInnen]];
+  const bez = (t) => {
+    const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+    return [a * P[0][0] + b * P[1][0] + c * P[2][0] + d * P[3][0], a * P[0][1] + b * P[1][1] + c * P[2][1] + d * P[3][1]];
+  };
+  const abl = (t) => {
+    const u = 1 - t;
+    const dx = 3 * u * u * (P[1][0] - P[0][0]) + 6 * u * t * (P[2][0] - P[1][0]) + 3 * t * t * (P[3][0] - P[2][0]);
+    const dz = 3 * u * u * (P[1][1] - P[0][1]) + 6 * u * t * (P[2][1] - P[1][1]) + 3 * t * t * (P[3][1] - P[2][1]);
+    const l = Math.hypot(dx, dz) || 1;
+    return [dx / l, dz / l];
+  };
+  const achse = [], tangenten = [];
+  for (let i = 0; i <= n; i++) { achse.push(bez(i / n)); tangenten.push(abl(i / n)); }
+  // Ränder; Punkte, die in engen Bögen rückwärts laufen würden, weglassen (keine Schleifen)
+  const rand = (s) => {
+    const roh = achse.map(([x, z], i) => { const [tx, tz] = tangenten[i]; return [x - tz * w * s, z + tx * w * s]; });
+    const out = [roh[0]];
+    for (let i = 1; i < roh.length; i++) {
+      const q = out[out.length - 1];
+      const [tx, tz] = tangenten[i];
+      if ((roh[i][0] - q[0]) * tx + (roh[i][1] - q[1]) * tz > 1e-4 || i === roh.length - 1) out.push(roh[i]);
+    }
+    return out;
+  };
+  return { achse, tangenten, links: rand(1), rechts: rand(-1) };
+}
+
 /**
  * Szene aufbauen. Liefert {group, masse, center, size}.
  * @param THREE three.js-Modul
@@ -112,36 +171,77 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
   deckel.rotation.set(-0.35, 0, 0.25);
   g.add(deckel);
 
-  // Berme mit Gerinne (gerade vom Zulauf gegenüber zum Auslauf bei 12 Uhr)
-  const out = (inspection?.connections || []).find((c) => c.dir === 'out');
-  const dnOut = Math.min(0.8, Math.max(0.15, (Number(out?.dn) || 300) / 1000));
+  // Berme mit Gerinne: vom Hauptzulauf im Bogen zum Auslauf (bei gegenüberliegenden Anschlüssen gerade)
+  const ga = gerinneAnschluesse(inspection?.connections || [], T);
+  const dnOut = Math.min(0.8, Math.max(0.15, (Number(ga.aus?.dn) || 300) / 1000));
   const rC = dnOut / 2;
   const rInnen = M.unterteilDa ? (M.unterteil.eckig ? Math.min(M.unterteil.l, M.unterteil.w) / 2 : rU) : rOben;
   const bisScheitel = ['1', '3', '4'].includes(M.gerinne);
   const hBerme = !M.gerinne ? 0 : bisScheitel ? dnOut : rC;
   if (M.gerinne && M.unterteilDa && rInnen > rC + 0.05) {
-    const w = rC;
-    const side = (sgn) => {
-      const s = new THREE.Shape();
-      const a = Math.acos(Math.min(0.999, w / rInnen));
-      const y0 = Math.sqrt(rInnen * rInnen - w * w);
-      s.moveTo(sgn * w, -y0);
-      if (sgn > 0) s.absarc(0, 0, rInnen, -a, a, false);
-      else s.absarc(0, 0, rInnen, Math.PI + a, Math.PI - a, true);
-      s.lineTo(sgn * w, -y0);
-      const geo = new THREE.ExtrudeGeometry(s, { depth: hBerme, bevelEnabled: false, curveSegments: 32 });
+    const v = gerinneVerlauf({ uhrZu: ga.uhrZu, uhrAus: ga.uhrAus, rInnen, w: rC });
+    // Berme: Fläche zwischen einem Gerinnerand und der Wand auf derselben Seite (s = +1 links, -1 rechts)
+    const naechster = ([x, z]) => {
+      let k = 0, best = Infinity;
+      v.achse.forEach(([ax, az], i) => { const d = (ax - x) ** 2 + (az - z) ** 2; if (d < best) { best = d; k = i; } });
+      return k;
+    };
+    const seite = (s) => {
+      const rand = (s > 0 ? v.links : v.rechts).map(([x, z]) => [x, z]);
+      const aufWand = ([x, z]) => { const l = Math.hypot(x, z) || 1; return [x / l * rInnen, z / l * rInnen]; };
+      rand[0] = aufWand(rand[0]);
+      rand[rand.length - 1] = aufWand(rand[rand.length - 1]);
+      const a0 = Math.atan2(rand.at(-1)[1], rand.at(-1)[0]);
+      const a1 = Math.atan2(rand[0][1], rand[0][0]);
+      // Wandbogen vom Ende zurück zum Anfang – in die Richtung, die auf der richtigen Seite liegt
+      const bogen = (dir) => {
+        let d = a1 - a0;
+        if (dir > 0 && d <= 0) d += Math.PI * 2;
+        if (dir < 0 && d >= 0) d -= Math.PI * 2;
+        return Array.from({ length: 33 }, (_, i) => { const a = a0 + d * i / 32; return [Math.cos(a) * rInnen, Math.sin(a) * rInnen]; });
+      };
+      const passt = (b) => {
+        const m = b[16];
+        const k = naechster(m);
+        const [tx, tz] = v.tangenten[k];
+        return ((m[0] - v.achse[k][0]) * -tz + (m[1] - v.achse[k][1]) * tx) * s > 0;
+      };
+      const b1 = bogen(1);
+      const bogenPunkte = passt(b1) ? b1 : bogen(-1);
+      const sh = new THREE.Shape();
+      const pts = [...rand, ...bogenPunkte.slice(1, -1)];
+      sh.moveTo(pts[0][0], -pts[0][1]); // Form in x/y, später gekippt: y = -z
+      for (const [x, z] of pts.slice(1)) sh.lineTo(x, -z);
+      sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: hBerme, bevelEnabled: false, curveSegments: 32 });
       const m = new THREE.Mesh(geo, mat(FARBEN.berme));
       m.rotation.x = -Math.PI / 2; // Form liegt in x/z, Extrusion nach oben
       g.add(m);
     };
-    side(1); side(-1);
-    const rinne = new THREE.Mesh(
-      new THREE.CylinderGeometry(rC, rC, rInnen * 2, 32, 1, true, -Math.PI / 2, Math.PI), // untere Halbschale
-      mat(FARBEN.gerinne),
-    );
-    rinne.rotation.x = Math.PI / 2;
-    rinne.position.y = rC;
-    g.add(rinne);
+    seite(1); seite(-1);
+    // Rinne: untere Halbschale entlang der Achse
+    const K = 16;
+    const pos = [];
+    const idx = [];
+    v.achse.forEach(([x, z], i) => {
+      const [tx, tz] = v.tangenten[i];
+      const nx = -tz, nz = tx;
+      for (let k = 0; k <= K; k++) {
+        const th = Math.PI * k / K;
+        pos.push(x + nx * rC * Math.cos(th), rC - rC * Math.sin(th), z + nz * rC * Math.cos(th));
+      }
+    });
+    for (let i = 0; i < v.achse.length - 1; i++) {
+      for (let k = 0; k < K; k++) {
+        const a = i * (K + 1) + k, b = a + K + 1;
+        idx.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    rg.setIndex(idx);
+    rg.computeVertexNormals();
+    g.add(new THREE.Mesh(rg, mat(FARBEN.gerinne)));
   }
 
   // Anschlüsse in Uhrlage und Höhe

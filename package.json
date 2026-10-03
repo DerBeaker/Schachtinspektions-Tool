@@ -1,7 +1,7 @@
 {
   "name": "schachtinspektions-tool",
   "private": true,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Schachtblick – Web-App zur Schachtinspektion nach ISYBAU / DWA-M 149-2",
   "type": "module",
   "scripts": {
