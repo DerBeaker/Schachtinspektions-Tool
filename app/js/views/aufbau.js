@@ -35,9 +35,16 @@ export function renderAufbau(main, { insp, manhole, changed }) {
 
   const daten = () => ({ bauteile: b, inspection: insp });
   const zeigeSchaetzung = (m) => {
-    schaetzEl.textContent = m?.geschaetzt?.length
+    if (!m) return;
+    const t = [m.geschaetzt?.length
       ? `Ergänzt mit üblichen Maßen (nicht erfasst): ${[...new Set(m.geschaetzt)].join(', ')}.`
-      : 'Alle Maße aus der Erfassung.';
+      : 'Alle Maße aus der Erfassung.'];
+    if (m.uebergangOffen) t.push('Oberer Abschluss (Konus oder Abdeckplatte) nicht erfasst – nur angedeutet.');
+    if (m.abweichung != null && Math.abs(m.abweichung) > 0.03) {
+      t.push(`Die Bauteile ergeben ${fmtNum(m.T)} m, die Schachttiefe ist ${fmtNum(m.Tsoll)} m (rote Linie) – bitte Höhen prüfen.`);
+    }
+    schaetzEl.textContent = t.join(' ');
+    schaetzEl.classList.toggle('warn-text', m.abweichung != null && Math.abs(m.abweichung) > 0.03);
   };
   const upd = debounce(() => {
     if (view3d) zeigeSchaetzung(view3d.update(daten()));
@@ -101,6 +108,18 @@ export function renderAufbau(main, { insp, manhole, changed }) {
     import('../components/modell3d.js').then((mod) => mod.schachtModell3d(box, daten())).then((x) => { v = x; }).catch(() => { box.textContent = '3D-Ansicht auf diesem Gerät nicht verfügbar.'; });
   }
 
+  // „ja“ (Anzahl/Höhe > 0), „nein“ (ausdrücklich 0) oder '' (nicht erfasst)
+  function auflageWert() {
+    const { anzahl, hoehe } = b.auflage;
+    if (anzahl > 0 || hoehe > 0) return 'ja';
+    return anzahl === 0 || hoehe === 0 ? 'nein' : '';
+  }
+  function abschlussWert() {
+    if (b.aufbau.abdeckplatte === true) return 'platte';
+    if (b.aufbau.konus === true) return 'konus';
+    return b.aufbau.konus === false && b.aufbau.abdeckplatte === false ? 'ohne' : '';
+  }
+
   function karte(titel, ...inhalt) {
     return h('div', { class: 'card card-pad stack' }, h('h3', titel), ...inhalt);
   }
@@ -119,10 +138,16 @@ export function renderAufbau(main, { insp, manhole, changed }) {
         eckig(b.deckel.form) ? field('Material', select(b.deckel.material, opt(REF.G102), set('deckel', 'material'))) : null,
         field('Lüftung', select(b.deckel.typ, opt(REF.G303), set('deckel', 'typ'))),
         ja('deckel', 'schmutzfaenger', 'Schmutzfänger vorhanden')),
-      karte('Auflageringe',
-        h('div', { class: 'grid2' },
+      karte('Auflageringe (Ausgleichsringe)',
+        field('Vorhanden?', segmented(auflageWert(), [['ja', 'ja'], ['nein', 'keine']], (v) => {
+          if (v === 'nein') b.auflage = { anzahl: 0, hoehe: 0 };
+          else if (!(b.auflage.anzahl > 0) && !(b.auflage.hoehe > 0)) b.auflage = { anzahl: 1, hoehe: null };
+          geaendert();
+          renderForm();
+        }, { small: true })),
+        auflageWert() === 'ja' ? h('div', { class: 'grid2' },
           field('Anzahl', numInput(b.auflage.anzahl, set('auflage', 'anzahl', { conv: (v) => (v === '' ? null : Math.round(Number(v))) }), { placeholder: '0' })),
-          field('Gesamthöhe', m('auflage', 'hoehe', 'cm')))),
+          field('Gesamthöhe', m('auflage', 'hoehe', 'cm'))) : null),
       karte('Schachtaufbau (Ringe, Konus)',
         field('Form', segmented(b.aufbau.form, FORM_KURZ, set('aufbau', 'form', { neu: true }), { small: true })),
         h('div', { class: 'grid2' },
@@ -130,8 +155,11 @@ export function renderAufbau(main, { insp, manhole, changed }) {
           eckig(b.aufbau.form) ? field('Breite', m('aufbau', 'breite')) : field('Höhe inkl. Konus', m('aufbau', 'hoehe'))),
         eckig(b.aufbau.form) ? field('Höhe inkl. Konus', m('aufbau', 'hoehe')) : null,
         field('Material', select(b.aufbau.material, opt(REF.G102), set('aufbau', 'material'))),
-        ja('aufbau', 'konus', 'Konus vorhanden'),
-        ja('aufbau', 'abdeckplatte', 'Abdeckplatte statt Konus')),
+        field('Oberer Abschluss', segmented(abschlussWert(), [['konus', 'Konus'], ['platte', 'Abdeckplatte'], ['ohne', 'ohne']], (v) => {
+          b.aufbau.konus = v === 'konus';
+          b.aufbau.abdeckplatte = v === 'platte';
+          geaendert();
+        }, { small: true }), 'Konus: verjüngt sich zur Abdeckung (Höhe im Modell 0,60 m). Abdeckplatte: flache Platte mit Öffnung.')),
       karte('Untere Schachtzone',
         toggle(!!b.unten.aktiv, (v) => {
           b.unten.aktiv = v;

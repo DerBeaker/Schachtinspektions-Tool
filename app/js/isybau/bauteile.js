@@ -273,15 +273,16 @@ export function bauteileZeilen(bt) {
     b.deckel.typ ? refLabel('G303', b.deckel.typ) : null,
     ja(b.deckel.schmutzfaenger, 'mit Schmutzfänger'),
   ]);
-  add('Auflageringe', [
+  const keineRinge = !(b.auflage.anzahl > 0) && !(b.auflage.hoehe > 0) && (b.auflage.anzahl === 0 || b.auflage.hoehe === 0);
+  add('Auflageringe', keineRinge ? ['keine'] : [
     b.auflage.anzahl != null ? `${b.auflage.anzahl} Stück` : null,
     b.auflage.hoehe != null ? `gesamt ${b.auflage.hoehe} cm` : null,
   ]);
   add('Schachtaufbau', [
     b.aufbau.form ? refLabel('G305', b.aufbau.form) : null,
     mass(b.aufbau.form, b.aufbau.laenge, b.aufbau.breite),
-    b.aufbau.konus === true ? 'mit Konus' : b.aufbau.konus === false ? 'ohne Konus' : null,
-    ja(b.aufbau.abdeckplatte, 'mit Abdeckplatte'),
+    b.aufbau.abdeckplatte === true ? 'mit Abdeckplatte' : b.aufbau.konus === true ? 'mit Konus'
+      : b.aufbau.konus === false ? (b.aufbau.abdeckplatte === false ? 'ohne Konus/Abdeckplatte' : 'ohne Konus') : null,
     b.aufbau.hoehe != null ? `Höhe ${de(b.aufbau.hoehe)} m` : null,
     b.aufbau.material ? refLabel('G102', b.aufbau.material) : null,
   ]);
@@ -351,47 +352,74 @@ export function regelschacht(dn = 1.0) {
 
 // ---- Maße für das 3D-Modell ------------------------------------------------
 
+/** Höhe von Abdeckung mit Rahmen, wenn sie sich nicht aus der Schachttiefe ergibt. */
+const RAHMEN = 0.12;
+/** Konushöhe nach DIN 4034-1. */
+const KONUS = 0.6;
+
 /**
- * Höhen und Durchmesser der Bauteile von der Sohle (z = 0) bis zum Deckel (z = Schachttiefe).
- * Fehlende Maße werden mit üblichen Werten ergänzt und als „geschätzt“ markiert.
+ * Höhen und Durchmesser der Bauteile von der Sohle (z = 0) nach oben – so, wie sie erfasst sind.
+ * Bauteile, die nicht erfasst sind (Auflageringe, Konus, Steighilfen, Gerinne), werden nicht
+ * gezeichnet. Nur fehlende Höhen von vorhandenen Teilen werden aus der Schachttiefe ergänzt und in
+ * `geschaetzt` genannt. Passen die Bauteile nicht zur Schachttiefe, steht die Differenz in
+ * `abweichung` (Modell höher = positiv) – das Modell wird dafür nicht verzerrt.
  */
 export function modellMasse(bt, tiefe) {
   const b = normBauteile(bt);
   const geschaetzt = [];
-  const est = (name, v, fallback) => { if (zahl(v) != null && zahl(v) > 0) return zahl(v); geschaetzt.push(name); return fallback; };
-  const T = est('Schachttiefe', tiefe, 2.5);
+  const pos = (v) => (zahl(v) != null && zahl(v) > 0 ? zahl(v) : null);
+  const Tsoll = pos(tiefe);
+  const T = Tsoll ?? 2.5;
+  if (Tsoll == null) geschaetzt.push('Schachttiefe');
   const eckig = (f) => f === 'E' || f === 'EV';
-  const dn = est('Schachtdurchmesser', b.aufbau.laenge ?? b.unterteil.laenge, 1.0);
-  const aufbau = { eckig: eckig(b.aufbau.form), l: dn, w: zahl(b.aufbau.breite) || dn };
+  let dn = pos(b.aufbau.laenge) ?? pos(b.unterteil.laenge);
+  if (dn == null) { dn = 1.0; geschaetzt.push('Schachtdurchmesser'); }
+  const aufbau = { eckig: eckig(b.aufbau.form), l: dn, w: pos(b.aufbau.breite) || dn };
   const unterteilDa = b.unterteil.form !== 'O';
-  const unterteil = { eckig: eckig(b.unterteil.form || b.aufbau.form), l: zahl(b.unterteil.laenge) || dn, w: zahl(b.unterteil.breite) || zahl(b.unterteil.laenge) || aufbau.w };
-  const dDeckel = est('Deckelweite', b.deckel.laenge, 0.625);
-  const rahmen = Math.min(0.2, T * 0.08);
-  const hAuflage = b.auflage.hoehe != null ? b.auflage.hoehe / 100 : (b.auflage.anzahl ? b.auflage.anzahl * 0.06 : est('Auflageringe', null, Math.min(0.1, T * 0.04)));
-  const hUnterteil = unterteilDa ? est('Unterteilhöhe', b.unterteil.hoehe, Math.min(1.0, Math.max(0.4, T * 0.3))) : 0;
-  const hUnten = b.unten.aktiv ? est('Höhe untere Zone', b.unten.hoehe, Math.min(1.0, T * 0.25)) : 0;
-  let hAufbau = zahl(b.aufbau.hoehe);
-  if (hAufbau == null || hAufbau <= 0) {
-    hAufbau = Math.max(0.2, T - rahmen - hAuflage - hUnterteil - hUnten);
+  const unterteil = { eckig: eckig(b.unterteil.form || b.aufbau.form), l: pos(b.unterteil.laenge) || dn, w: pos(b.unterteil.breite) || pos(b.unterteil.laenge) || aufbau.w };
+  let dDeckel = pos(b.deckel.laenge);
+  if (dDeckel == null) { dDeckel = 0.625; geschaetzt.push('Deckelweite'); }
+
+  // Auflageringe nur, wenn vorhanden (Anzahl oder Höhe > 0)
+  let hAuflage = 0;
+  if (pos(b.auflage.hoehe)) hAuflage = b.auflage.hoehe / 100;
+  else if (pos(b.auflage.anzahl)) { hAuflage = b.auflage.anzahl * 0.06; geschaetzt.push('Höhe Auflageringe'); }
+
+  let hUnterteil = unterteilDa ? pos(b.unterteil.hoehe) : 0;
+  let hUnten = b.unten.aktiv ? pos(b.unten.hoehe) : 0;
+  let hAufbau = pos(b.aufbau.hoehe);
+  if (hUnterteil == null) { hUnterteil = Math.min(1.0, Math.max(0.4, T * 0.3)); geschaetzt.push('Unterteilhöhe'); }
+  if (hUnten == null) { hUnten = Math.min(1.0, T * 0.25); geschaetzt.push('Höhe untere Zone'); }
+  if (hAufbau == null) {
+    hAufbau = Math.max(0.2, T - RAHMEN - hAuflage - hUnterteil - hUnten);
     geschaetzt.push('Aufbauhöhe');
   }
+  // Abdeckung mit Rahmen: Rest bis zur Schachttiefe, wenn plausibel – sonst Standardhöhe
+  const summe = hUnterteil + hUnten + hAufbau + hAuflage;
+  const rest = Tsoll != null ? Tsoll - summe : null;
+  const rahmen = rest != null && rest >= 0.04 && rest <= 0.35 ? rest : RAHMEN;
+  const oben = summe + rahmen;
+
   const abdeckplatte = b.aufbau.abdeckplatte === true;
-  const konus = !abdeckplatte && b.aufbau.konus !== false && dn > dDeckel + 0.1;
-  const hKonus = konus ? Math.min(0.6, hAufbau * 0.6) : 0;
+  const konus = !abdeckplatte && b.aufbau.konus === true && dn > dDeckel + 0.05;
+  const hKonus = konus ? Math.min(KONUS, hAufbau * 0.6) : 0;
   const hPlatte = abdeckplatte ? Math.min(0.2, hAufbau * 0.3) : 0;
-  // Bauteile von unten nach oben
   const z = { unterteil: 0 };
   z.unten = hUnterteil;
   z.aufbau = z.unten + hUnten;
   z.konus = z.aufbau + hAufbau - hKonus - hPlatte;
   z.auflage = z.aufbau + hAufbau;
   z.rahmen = z.auflage + hAuflage;
-  z.oben = Math.max(T, z.rahmen + 0.05);
+  z.oben = oben;
+  const steigArt = ['1', '2', '3', '4'].includes(b.steig.art) ? b.steig.art : b.steig.vorhanden === true ? '1' : null;
   return {
-    T, dn, dDeckel, aufbau, unterteil, unterteilDa, rahmen, hAuflage, hUnterteil, hUnten, hAufbau, hKonus, hPlatte, konus, abdeckplatte,
-    unten: b.unten.aktiv ? { l: zahl(b.unten.laenge) || dn, eckig: eckig(b.unten.form), uebergangsplatte: !!b.unten.uebergangsplatte, konus: !!b.unten.konus, podest: !!b.unten.podest } : null,
-    gerinne: b.unterteil.gerinneform || '0',
-    steig: b.steig.vorhanden === false || b.steig.art === '5' ? null : { art: b.steig.art || '1' },
+    T: oben, Tsoll, abweichung: Tsoll != null ? r2(oben - Tsoll) : null,
+    dn, dDeckel, aufbau, unterteil, unterteilDa, rahmen, hAuflage, hUnterteil, hUnten, hAufbau, hKonus, hPlatte, konus, abdeckplatte,
+    // weder Konus noch Abdeckplatte erfasst, Schacht aber weiter als die Abdeckung
+    uebergangOffen: !konus && !abdeckplatte && b.aufbau.konus !== false && dn > dDeckel + 0.05,
+    unten: b.unten.aktiv ? { l: pos(b.unten.laenge) || dn, eckig: eckig(b.unten.form), uebergangsplatte: !!b.unten.uebergangsplatte, konus: !!b.unten.konus, podest: !!b.unten.podest } : null,
+    gerinne: b.unterteil.gerinneform || null,
+    steig: steigArt ? { art: steigArt } : null,
     z, geschaetzt,
   };
 }

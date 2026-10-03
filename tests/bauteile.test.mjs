@@ -79,6 +79,32 @@ test('Höhenbilanz und Maße für das 3D-Modell', () => {
   assert.ok(L.geschaetzt.includes('Schachttiefe'));
 });
 
+test('3D-Maße folgen der Erfassung: nicht vorhandene Teile fehlen, Höhenänderungen wirken', () => {
+  const b = regelschacht();
+  b.aufbau.hoehe = 1.55;
+  b.unterteil.hoehe = 0.6;
+  b.auflage = { anzahl: 0, hoehe: 0 }; // keine Ausgleichsringe
+  let M = modellMasse(b, 2.42);
+  assert.equal(M.hAuflage, 0);
+  assert.ok(!M.geschaetzt.some((x) => /Auflage/.test(x)));
+  assert.equal(M.abweichung, 0);
+  assert.ok(Math.abs(M.rahmen - 0.27) < 1e-9); // Rest bis zur Schachttiefe
+  // Aufbau kürzer -> Modell wird niedriger statt den Rahmen zu strecken, Differenz wird gemeldet
+  b.aufbau.hoehe = 1.0;
+  M = modellMasse(b, 2.42);
+  assert.ok(Math.abs(M.z.oben - 1.72) < 1e-9);
+  assert.equal(M.abweichung, -0.7);
+  // nicht erfasst = nicht gezeichnet
+  const leer = modellMasse({ aufbau: { laenge: 1, hoehe: 1.8 }, unterteil: { hoehe: 0.5 } }, 2.42);
+  assert.equal(leer.hAuflage, 0);
+  assert.equal(leer.konus, false);
+  assert.equal(leer.uebergangOffen, true);
+  assert.equal(leer.steig, null);
+  assert.equal(leer.gerinne, null);
+  assert.equal(modellMasse({ aufbau: { konus: false, abdeckplatte: false } }, 2).uebergangOffen, false);
+  assert.equal(Object.fromEntries(bauteileZeilen(b)).Auflageringe, 'keine');
+});
+
 test('Import: Bauteile aus den offiziellen ISYBAU-2024-Stammdaten', { skip: !existsSync(sample) && 'Beispieldaten fehlen (npm run xsd)' }, () => {
   const ms = importDatei(readFileSync(sample)).stamm.manholes;
   const m = ms.find((x) => x.name === '119001');

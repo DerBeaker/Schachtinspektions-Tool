@@ -64,6 +64,7 @@ await page.getByRole('button', { name: 'Vorlage Regelschacht DN 1000' }).click()
   const ersetzen = page.getByRole('button', { name: 'Ersetzen' });
   if (await ersetzen.isVisible().catch(() => false)) await ersetzen.click();
 }
+await page.locator('.card', { hasText: 'Auflageringe' }).getByRole('radio', { name: 'ja' }).click();
 await page.getByLabel('Gesamthöhe').fill('12 cm');
 await page.getByLabel('Höhe inkl. Konus').fill('1,55');
 {

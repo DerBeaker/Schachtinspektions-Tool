@@ -98,9 +98,9 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
     lathe([[rOben, M.z.konus], [rOben + wand, M.z.konus], [rD + wand, M.z.auflage], [rD, M.z.auflage], [rOben, M.z.konus]], FARBEN.konus);
   } else if (M.abdeckplatte) {
     lathe([[rD, M.z.auflage - M.hPlatte], [rOben + wand, M.z.auflage - M.hPlatte], [rOben + wand, M.z.auflage], [rD, M.z.auflage], [rD, M.z.auflage - M.hPlatte]], FARBEN.konus);
-  } else if (rOben > rD + 0.02) {
-    // ohne Konus/Platte: Übergang als dünne Platte
-    lathe([[rD, M.z.auflage - 0.12], [rOben + wand, M.z.auflage - 0.12], [rOben + wand, M.z.auflage], [rD, M.z.auflage], [rD, M.z.auflage - 0.12]], FARBEN.konus);
+  } else if (M.uebergangOffen) {
+    // weder Konus noch Abdeckplatte erfasst: Übergang nur angedeutet (durchscheinend)
+    lathe([[rD, M.z.auflage - 0.12], [rOben + wand, M.z.auflage - 0.12], [rOben + wand, M.z.auflage], [rD, M.z.auflage], [rD, M.z.auflage - 0.12]], FARBEN.konus, { transparent: true, opacity: 0.3, depthWrite: false });
   }
   // Auflageringe und Rahmen
   if (M.hAuflage > 0) ring(rD, M.z.auflage, M.z.rahmen, FARBEN.auflage, 0.1);
@@ -118,8 +118,8 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
   const rC = dnOut / 2;
   const rInnen = M.unterteilDa ? (M.unterteil.eckig ? Math.min(M.unterteil.l, M.unterteil.w) / 2 : rU) : rOben;
   const bisScheitel = ['1', '3', '4'].includes(M.gerinne);
-  const hBerme = bisScheitel ? dnOut : rC;
-  if (M.unterteilDa && rInnen > rC + 0.05) {
+  const hBerme = !M.gerinne ? 0 : bisScheitel ? dnOut : rC;
+  if (M.gerinne && M.unterteilDa && rInnen > rC + 0.05) {
     const w = rC;
     const side = (sgn) => {
       const s = new THREE.Shape();
@@ -201,7 +201,17 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
     }
   }
 
-  return { group: g, masse: M, center: new THREE.Vector3(0, T / 2, 0), size: Math.max(T, rOben * 2 + 0.6) };
+  // Passen die Bauteile nicht zur Schachttiefe: rote Linie auf Höhe der Deckeloberkante laut Tiefe
+  if (M.abweichung != null && Math.abs(M.abweichung) > 0.03) {
+    const r = Math.max(rOben, rU) + 0.25;
+    const soll = new THREE.Mesh(new THREE.TorusGeometry(r, 0.012, 8, 96), new THREE.MeshBasicMaterial({ color: '#e03131' }));
+    soll.rotation.x = Math.PI / 2;
+    soll.position.y = M.Tsoll;
+    g.add(soll);
+  }
+
+  const hoehe = Math.max(T, M.Tsoll || 0);
+  return { group: g, masse: M, center: new THREE.Vector3(0, hoehe / 2, 0), size: Math.max(hoehe, rOben * 2 + 0.6) };
 }
 
 /**
@@ -239,12 +249,19 @@ export async function schachtModell3d(container, daten, { interaktiv = true, hin
       scene.remove(model.group);
       model.group.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
     }
+    const vorher = model && controls ? { size: model.size, off: camera.position.clone().sub(controls.target) } : null;
     model = baueSchacht(THREE, d);
     scene.add(model.group);
-    const dist = model.size * abstand + 0.8;
-    camera.position.set(dist * 0.62, model.center.y + model.size * 0.55, dist * 0.78);
-    camera.lookAt(model.center);
-    controls?.target.copy(model.center);
+    if (vorher) {
+      // Blickwinkel des Benutzers behalten, nur Ausschnitt an die neue Größe anpassen
+      controls.target.copy(model.center);
+      camera.position.copy(model.center).add(vorher.off.multiplyScalar(model.size / vorher.size));
+    } else {
+      const dist = model.size * abstand + 0.8;
+      camera.position.set(dist * 0.62, model.center.y + model.size * 0.55, dist * 0.78);
+      camera.lookAt(model.center);
+      controls?.target.copy(model.center);
+    }
     controls?.update();
     render();
     return model.masse;
