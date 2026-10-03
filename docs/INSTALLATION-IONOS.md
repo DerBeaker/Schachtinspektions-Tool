@@ -29,12 +29,28 @@ heißen sinngemäß wie unten angegeben; IONOS ändert die Oberfläche gelegentl
 3. Notieren: **Hostname** (z. B. `db5001234567.hosting-data.io`), **Datenbankname** (`dbs1234567`),
    **Benutzername** (`dbu1234567`) und Passwort.
 
-## 4. E-Mail-Absender (für Einladungen und „Passwort vergessen“)
+## 4. E-Mail-Postfach für den Versand (Einladungen, „Passwort vergessen“)
 
-Ein vorhandenes Postfach Ihrer Domain verwenden oder unter **E-Mail** eines anlegen, z. B.
-`noreply@mmse-software.com`. IONOS versendet Mails aus PHP nur mit einem Absender einer eigenen Domain.
-Kommt keine Mail an, zeigt die App den Einladungslink trotzdem an – er kann dann z. B. per WhatsApp
-weitergegeben werden.
+1. IONOS-Kundenbereich → **E-Mail** → ein Postfach anlegen, z. B. `noreply@mmse-software.com`,
+   und das Passwort notieren.
+2. In `config.php` (Schritt 6) den Block **`smtp`** eintragen – das ist bei IONOS der zuverlässige Weg:
+
+   ```php
+   'smtp' => [
+       'host' => 'smtp.ionos.de',
+       'port' => 465,
+       'user' => 'noreply@mmse-software.com',
+       'pass' => 'POSTFACH-PASSWORT',
+   ],
+   'mail_from' => 'noreply@mmse-software.com',   // gleiche Adresse wie das Postfach
+   ```
+
+3. Nach der Einrichtung im **Betreiber-Bereich → „E-Mail-Versand testen“** prüfen. Klappt es nicht, steht
+   dort der Grund (z. B. falsches Postfach-Passwort).
+
+Ohne `smtp` versucht der Server PHP `mail()`; das lehnt IONOS ab, wenn der Absender kein Postfach der
+eigenen Domain ist. Kommt keine Mail an, zeigt die App den Einladungslink trotzdem an – er kann dann
+per E-Mail oder Messenger weitergegeben werden.
 
 ## 5. Dateien hochladen
 
@@ -56,6 +72,7 @@ Im Ordner `api/` die Datei `config.sample.php` als **`config.php`** kopieren und
 'photo_dir' => __DIR__ . '/data/photos',          // durch .htaccess geschützt
 'app_url' => 'https://app.mmse-software.com/',      // Adresse für Links in E-Mails
 'mail_from' => 'noreply@mmse-software.com',
+'smtp' => ['host' => 'smtp.ionos.de', 'port' => 465, 'user' => 'noreply@mmse-software.com', 'pass' => 'POSTFACH-PASSWORT'],
 ```
 
 `config.php` niemals weitergeben – sie enthält das Datenbank-Passwort. Der KI-Assistent bleibt
@@ -102,7 +119,8 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
 | „Server noch nicht eingerichtet (config.php fehlt)“ | `config.php` liegt nicht im Ordner `api/` |
 | „Datenbankverbindung fehlgeschlagen“ | Hostname, Datenbankname, Benutzer und Passwort aus Schritt 3 prüfen |
 | Kamera/GPS funktionieren nicht | Seite über **https://** aufrufen (SSL-Zertifikat aktiv?) |
-| Einladungs-Mail kommt nicht an | `mail_from` muss ein Postfach der eigenen Domain sein; Spam-Ordner prüfen; Link aus der App weitergeben |
+| „Der Server konnte keine E-Mail senden“ | SMTP in `config.php` eintragen (Schritt 4); im Betreiber-Bereich „E-Mail-Versand testen“ zeigt den Grund. Bis dahin den angezeigten Link weitergeben |
+| Mail verschickt, kommt aber nicht an | Spam-Ordner prüfen; Absender (`mail_from`) = SMTP-Postfach |
 | Kartenhintergrund fehlt | Internetverbindung nötig (basemap.de / OpenStreetMap); Schächte werden trotzdem angezeigt |
 | `api/lib/` im Browser erreichbar | `.htaccess`-Dateien wurden nicht hochgeladen (versteckte Dateien anzeigen) |
 

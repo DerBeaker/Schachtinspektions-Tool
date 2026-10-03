@@ -233,6 +233,7 @@ export const sync = {
   opInvite(d) { return this.request('op-invite', { method: 'POST', body: d }); },
   opDeleteTenant(id, confirm) { return this.request('op-tenant-delete', { method: 'POST', body: { id, confirm } }); },
   opExport(tenant) { return this.request('op-export', { query: { tenant } }); },
+  opMailtest(email) { return this.request('op-mailtest', { method: 'POST', body: { email } }); },
   changePassword(oldPw, newPw) { return this.request('password', { method: 'POST', body: { old: oldPw, new: newPw } }); },
 
   async ai(payload) {

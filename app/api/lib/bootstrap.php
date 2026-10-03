@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-const SB_VERSION = '0.2.0';
+const SB_VERSION = '0.2.1';
 /** Betreiber der Plattform (erscheint in Hinweisen zu Lizenz und Sperre). */
 const SB_VENDOR = 'MMSE Software Engineering';
 const SB_TYPES = ['projects', 'manholes', 'inspections'];
@@ -210,22 +210,146 @@ function sb_valid_email(string $e): bool
     return strlen($e) <= 190 && filter_var($e, FILTER_VALIDATE_EMAIL) !== false;
 }
 
-/**
- * E-Mail senden (Text). Mit 'mail_log' in der Konfiguration wird stattdessen in eine Datei
- * geschrieben (Tests, lokale Installation). Liefert true, wenn die Mail übergeben wurde.
- */
-function sb_mail(string $to, string $subject, string $text): bool
+/** Absender der E-Mails (config „mail_from“, sonst noreply@<Domain>). */
+function sb_mail_from(): string
+{
+    $c = sb_config();
+    return $c['mail_from'] ?? ($c['smtp']['user'] ?? ('noreply@' . preg_replace('/^www\./', '', explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0])));
+}
+
+/** Wie E-Mails verschickt werden: 'log' (Datei), 'smtp', 'mail' (PHP mail()) oder 'aus'. */
+function sb_mail_methode(): string
 {
     $c = sb_config();
     if (!empty($c['mail_log'])) {
-        return file_put_contents($c['mail_log'], "To: $to\nSubject: $subject\n\n$text\n---\n", FILE_APPEND) !== false;
+        return 'log';
     }
-    if (($c['mail'] ?? true) === false || !function_exists('mail')) {
+    if (!empty($c['smtp']['host'])) {
+        return 'smtp';
+    }
+    return ($c['mail'] ?? true) === false || !function_exists('mail') ? 'aus' : 'mail';
+}
+
+/** Grund, warum die letzte E-Mail nicht verschickt wurde (für die Anzeige). */
+function sb_mail_fehler(?string $set = null, bool $reset = false): ?string
+{
+    static $fehler = null;
+    if ($reset) {
+        $fehler = null;
+    } elseif ($set !== null) {
+        $fehler = $set;
+    }
+    return $fehler;
+}
+
+/**
+ * E-Mail senden (Text). Wege: SMTP (empfohlen, z. B. smtp.ionos.de mit einem Postfach der eigenen
+ * Domain), PHP mail() oder – für Tests/lokal – 'mail_log' (Datei). Liefert true, wenn die Mail
+ * übergeben wurde; sonst steht der Grund in sb_mail_fehler().
+ */
+function sb_mail(string $to, string $subject, string $text): bool
+{
+    sb_mail_fehler(null, true);
+    $c = sb_config();
+    $from = sb_mail_from();
+    try {
+        switch (sb_mail_methode()) {
+            case 'log':
+                if (file_put_contents($c['mail_log'], "To: $to\nFrom: $from\nSubject: $subject\n\n$text\n---\n", FILE_APPEND) === false) {
+                    throw new RuntimeException('Mail-Logdatei nicht beschreibbar.');
+                }
+                return true;
+            case 'smtp':
+                sb_smtp_send($c['smtp'], $from, $to, $subject, $text);
+                return true;
+            case 'mail':
+                $headers = "From: Schachtblick <$from>\r\nReply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
+                $subj = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+                if (@mail($to, $subj, $text, $headers, '-f' . $from) || @mail($to, $subj, $text, $headers)) {
+                    return true;
+                }
+                throw new RuntimeException("PHP mail() hat die E-Mail abgelehnt. Meist ist der Absender „{$from}“ kein Postfach der eigenen Domain – in config.php „mail_from“ anpassen oder besser SMTP einrichten (siehe config.sample.php).");
+            default:
+                throw new RuntimeException('E-Mail-Versand ist ausgeschaltet (config.php: mail = false).');
+        }
+    } catch (Throwable $e) {
+        error_log('[schachtblick] E-Mail an ' . $to . ' fehlgeschlagen: ' . $e->getMessage());
+        sb_mail_fehler($e->getMessage());
         return false;
     }
-    $from = $c['mail_from'] ?? ('noreply@' . preg_replace('/^www\./', '', explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0]));
-    $headers = "From: Schachtblick <$from>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
-    return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, $headers, '-f' . $from);
+}
+
+/**
+ * Minimaler SMTP-Versand (SSL auf Port 465, STARTTLS auf 587, 'none' nur für Tests) mit AUTH LOGIN.
+ * Der Text wird base64-kodiert übertragen (Umlaute, keine Probleme mit Punkten am Zeilenanfang).
+ */
+function sb_smtp_send(array $s, string $from, string $to, string $subject, string $text): void
+{
+    $host = (string) $s['host'];
+    $port = (int) ($s['port'] ?? 465);
+    $secure = $s['secure'] ?? ($port === 465 ? 'ssl' : 'tls');
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true, 'SNI_enabled' => true]]);
+    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . "$host:$port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$fp) {
+        throw new RuntimeException("Keine Verbindung zum Mailserver $host:$port ($errstr).");
+    }
+    stream_set_timeout($fp, 20);
+    $lesen = function () use ($fp): string {
+        $antwort = '';
+        while (($zeile = fgets($fp, 1024)) !== false) {
+            $antwort .= $zeile;
+            if (strlen($zeile) < 4 || $zeile[3] === ' ') {
+                break;
+            }
+        }
+        return $antwort;
+    };
+    $befehl = function (?string $cmd, array $ok, string $zeigen = '') use ($fp, $lesen): string {
+        if ($cmd !== null) {
+            fwrite($fp, $cmd . "\r\n");
+        }
+        $r = $lesen();
+        if (!in_array((int) substr($r, 0, 3), $ok, true)) {
+            throw new RuntimeException('Mailserver: ' . trim($r ?: 'keine Antwort') . ($zeigen !== '' ? " (bei $zeigen)" : ''));
+        }
+        return $r;
+    };
+    try {
+        $befehl(null, [220]);
+        $ehlo = 'EHLO ' . preg_replace('/[^A-Za-z0-9.-]/', '', $_SERVER['HTTP_HOST'] ?? (gethostname() ?: 'localhost'));
+        $befehl($ehlo, [250]);
+        if ($secure === 'tls') {
+            $befehl('STARTTLS', [220]);
+            $methode = STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT') ? STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT : 0);
+            if (!stream_socket_enable_crypto($fp, true, $methode)) {
+                throw new RuntimeException('TLS-Verschlüsselung zum Mailserver fehlgeschlagen.');
+            }
+            $befehl($ehlo, [250]);
+        }
+        if (!empty($s['user'])) {
+            $befehl('AUTH LOGIN', [334]);
+            $befehl(base64_encode((string) $s['user']), [334]);
+            $befehl(base64_encode((string) ($s['pass'] ?? '')), [235], 'Anmeldung – Benutzer/Passwort des Postfachs prüfen');
+        }
+        $befehl("MAIL FROM:<$from>", [250], 'Absender');
+        $befehl("RCPT TO:<$to>", [250, 251], 'Empfänger');
+        $befehl('DATA', [354]);
+        $domain = substr(strrchr($from, '@') ?: '@localhost', 1);
+        $kopf = [
+            'Date: ' . date('r'),
+            "From: Schachtblick <$from>",
+            "To: <$to>",
+            'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=',
+            'Message-ID: <' . bin2hex(random_bytes(12)) . "@$domain>",
+            'MIME-Version: 1.0',
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+        ];
+        $befehl(implode("\r\n", $kopf) . "\r\n\r\n" . rtrim(chunk_split(base64_encode($text), 76, "\r\n")) . "\r\n.", [250], 'Versand');
+        fwrite($fp, "QUIT\r\n");
+    } finally {
+        fclose($fp);
+    }
 }
 
 /** Einmal-Link (Einladung oder Passwort) anlegen; liefert den Klartext-Token. */

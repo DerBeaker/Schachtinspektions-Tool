@@ -25,7 +25,9 @@ export async function renderBetrieb(view) {
   main.append(
     h('div', { class: 'row between', style: { margin: '4px 0 12px' } },
       h('p', { class: 'muted small', style: { margin: 0 } }, 'Jede Firma sieht nur ihre eigenen Daten. Neue Firmen erhalten eine Einladung für ihren Administrator.'),
-      btn('Firma anlegen', { icon: 'plus', variant: 'primary', onClick: () => bearbeiten(null) })),
+      h('div', { class: 'row wrap' },
+        btn('E-Mail-Versand testen', { icon: 'upload', variant: 'ghost', onClick: mailTest }),
+        btn('Firma anlegen', { icon: 'plus', variant: 'primary', onClick: () => bearbeiten(null) }))),
     summary, h('div', { class: 'section-title' }, 'Firmen'), listEl);
 
   let tenants = [];
@@ -109,6 +111,31 @@ export async function renderBetrieb(view) {
         field('Name', input('', (v) => { d.name = v; }))),
       actions: [btn('Einladung senden', { variant: 'primary', onClick: async () => {
         try { const r = await sync.opInvite({ tenant: t.id, ...d }); s.close(); linkSheet(r); load(); } catch (e) { toast(e.message, 'error', 5000); }
+      } })],
+    });
+  }
+
+  function mailTest() {
+    const d = { email: sync.auth?.user?.email || '' };
+    const s = sheet({
+      title: 'E-Mail-Versand testen',
+      body: h('div', { class: 'stack' },
+        h('p', { class: 'muted small' }, 'Schickt eine Test-E-Mail über den Server. So sehen Sie, ob Einladungen und „Passwort vergessen“-Links ankommen – und falls nicht, warum.'),
+        field('An', input(d.email, (v) => { d.email = v; }, { type: 'email', autocapitalize: 'off', inputmode: 'email' }))),
+      actions: [btn('Test-E-Mail senden', { variant: 'primary', onClick: async () => {
+        try {
+          const r = await sync.opMailtest(d.email.trim());
+          s.close();
+          const weg = { smtp: 'SMTP', mail: 'PHP mail()', log: 'Logdatei', aus: 'ausgeschaltet' }[r.methode] || r.methode;
+          sheet({
+            title: r.ok ? 'Test-E-Mail verschickt' : 'Versand fehlgeschlagen',
+            body: h('div', { class: 'stack' },
+              h('p', null, r.ok ? `Die Test-E-Mail an ${r.to} wurde an den Mailserver übergeben. Bitte Posteingang (und Spam-Ordner) prüfen.` : `Die E-Mail an ${r.to} konnte nicht verschickt werden.`),
+              r.fehler ? h('div', { class: 'issue warn' }, icon('alert', 18), h('span', r.fehler)) : null,
+              h('p', { class: 'muted small' }, `Versand über: ${weg} · Absender: ${r.from}`),
+              r.ok && r.methode === 'smtp' ? null : h('p', { class: 'muted small' }, 'Zuverlässig bei IONOS: in api/config.php den Block „smtp“ mit einem Postfach der eigenen Domain eintragen (smtp.ionos.de, Port 465, Postfach-Adresse und -Passwort) – siehe config.sample.php und Installationsanleitung.')),
+          });
+        } catch (e) { toast(e.message, 'error', 5000); }
       } })],
     });
   }

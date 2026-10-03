@@ -157,7 +157,7 @@ function sb_invite_create(int $tenant, array $in, array $by): array
         . "Ihre Anmeldung ist danach Ihre E-Mail-Adresse $email.\n\n"
         . 'Schachtblick – ' . SB_VENDOR . "\n";
     $mailed = sb_mail($email, "Einladung zu Schachtblick – $firma", $text);
-    return ['ok' => true, 'link' => $link, 'mailed' => $mailed, 'email' => $email, 'role' => $role];
+    return ['ok' => true, 'link' => $link, 'mailed' => $mailed, 'mailError' => $mailed ? null : sb_mail_fehler(), 'email' => $email, 'role' => $role];
 }
 
 function handle_invite(array $u): never
@@ -405,6 +405,19 @@ function handle_op_tenant_delete(array $u): never
         throw $e;
     }
     sb_json(['ok' => true]);
+}
+
+/** Test-E-Mail an den Betreiber (oder eine angegebene Adresse) – zeigt, ob und wie der Versand klappt. */
+function handle_op_mailtest(array $u): never
+{
+    sb_require_operator($u);
+    $in = sb_input(2000);
+    $to = strtolower(trim((string) ($in['email'] ?? ''))) ?: (string) ($u['email'] ?? '');
+    if (!sb_valid_email($to)) {
+        sb_fail(400, 'Bitte eine E-Mail-Adresse angeben (für Ihr Betreiber-Konto ist keine hinterlegt).');
+    }
+    $ok = sb_mail($to, 'Schachtblick – Test-E-Mail', "Diese Test-E-Mail zeigt, dass der Versand von Einladungen und\n„Passwort vergessen“-Links funktioniert.\n\nVersand über: " . sb_mail_methode() . "\nAbsender: " . sb_mail_from() . "\n\nSchachtblick – " . SB_VENDOR . "\n");
+    sb_json(['ok' => $ok, 'to' => $to, 'methode' => sb_mail_methode(), 'from' => sb_mail_from(), 'fehler' => $ok ? null : sb_mail_fehler()]);
 }
 
 /** Alle Datensätze einer Firma als JSON (z. B. bei Kündigung); Fotos bleiben im Fotoordner. */

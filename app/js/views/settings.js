@@ -25,6 +25,7 @@ export function linkSheet(r) {
     title: 'Einladung erstellt',
     body: h('div', { class: 'stack' },
       h('p', null, r.mailed ? `Eine E-Mail an ${r.email} ist unterwegs.` : `Der Server konnte keine E-Mail senden – bitte den Link an ${r.email} weitergeben.`),
+      !r.mailed && r.mailError ? h('p', { class: 'muted small' }, `Grund: ${r.mailError}`) : null,
       ta,
       h('p', { class: 'muted small' }, 'Der Link ist 14 Tage gültig und funktioniert nur einmal.'),
       btn('Link kopieren', { icon: 'file', variant: 'soft', onClick: async () => {

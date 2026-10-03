@@ -77,6 +77,9 @@ switch ("$method $route") {
     case 'GET op-export':
         handle_op_export(sb_user());
 
+    case 'POST op-mailtest':
+        handle_op_mailtest(sb_user());
+
     case 'POST sync':
         handle_sync(sb_user());
 

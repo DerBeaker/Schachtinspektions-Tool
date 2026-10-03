@@ -20,7 +20,16 @@ return [
     // Adresse der App für Links in E-Mails (Einladungen, „Passwort vergessen“).
     // Leer = automatisch (Ordner über api/), z. B. 'https://app.mmse-software.com/'
     'app_url' => '',
-    // Absender der E-Mails. Bei IONOS ein vorhandenes Postfach der eigenen Domain verwenden.
+    // E-Mails (Einladungen, „Passwort vergessen“). Empfohlen bei IONOS: Versand per SMTP über ein
+    // vorhandenes Postfach der eigenen Domain (im IONOS-Kundenbereich unter „E-Mail“ anlegen).
+    // Ohne 'smtp' wird PHP mail() verwendet – das klappt bei IONOS nur mit einem gültigen Absender.
+    // 'smtp' => [
+    //     'host' => 'smtp.ionos.de',
+    //     'port' => 465,                         // 465 = SSL, 587 = STARTTLS
+    //     'user' => 'noreply@mmse-software.com', // Postfach-Adresse
+    //     'pass' => 'POSTFACH-PASSWORT',
+    // ],
+    // Absender (Standard: das SMTP-Postfach). Muss ein Postfach der eigenen Domain sein.
     'mail_from' => 'noreply@mmse-software.com',
     // false = keine E-Mails senden (Links werden dann nur in der App angezeigt)
     'mail' => true,

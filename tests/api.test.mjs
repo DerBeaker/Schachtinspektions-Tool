@@ -265,6 +265,65 @@ test('Mehrere Firmen: Betreiber, Einladung, Lizenz, Firmendaten, Passwort verges
   assert.equal((await login('mia@rohr-kanal.de', 'neues-pass-9')).status, 403);
 });
 
+test('E-Mail per SMTP (Anmeldung, Umlaute, falsches Passwort)', { skip: !hasPhp && 'PHP fehlt' }, async () => {
+  const net = await import('node:net');
+  const received = [];
+  // kleiner SMTP-Server: AUTH LOGIN mit u/p, nimmt eine Mail an
+  const srv = net.createServer((sock) => {
+    let state = 'cmd', user = '', data = '';
+    const send = (l) => sock.write(l + '\r\n');
+    send('220 test ESMTP');
+    let buf = '';
+    sock.on('data', (chunk) => {
+      buf += chunk.toString('latin1');
+      let i;
+      while ((i = buf.indexOf('\r\n')) >= 0) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (state === 'data') {
+          if (line === '.') { received.push(data); state = 'cmd'; send('250 OK queued'); } else data += line + '\n';
+          continue;
+        }
+        if (state === 'user') { user = Buffer.from(line, 'base64').toString(); state = 'pass'; send('334 UGFzc3dvcmQ6'); continue; }
+        if (state === 'pass') { state = 'cmd'; send(user === 'u@test.de' && Buffer.from(line, 'base64').toString() === 'geheim' ? '235 ok' : '535 Authentication credentials invalid'); continue; }
+        if (/^EHLO/.test(line)) send('250-test\r\n250 AUTH LOGIN');
+        else if (line === 'AUTH LOGIN') { state = 'user'; send('334 VXNlcm5hbWU6'); }
+        else if (/^MAIL FROM|^RCPT TO/.test(line)) send('250 OK');
+        else if (line === 'DATA') { state = 'data'; data = ''; send('354 go'); }
+        else if (line === 'QUIT') { send('221 bye'); sock.end(); }
+        else send('500 ?');
+      }
+    });
+  }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  const port = srv.address().port;
+  const dir = mkdtempSync(join(tmpdir(), 'sbmail-'));
+  const run = (pass) => {
+    const cfg = join(dir, `cfg-${pass}.php`);
+    writeFileSync(cfg, `<?php return ['db_dsn' => 'sqlite::memory:', 'mail_from' => 'u@test.de',
+      'smtp' => ['host' => '127.0.0.1', 'port' => ${port}, 'secure' => 'none', 'user' => 'u@test.de', 'pass' => '${pass}']];`);
+    return new Promise((res) => {
+      const p = spawn('php', ['-r', `require '${join(root, 'app/api/lib/bootstrap.php')}';
+        $ok = sb_mail('empfaenger@test.de', 'Einladung für Müller & Söhne', "Grüße\n.\nLink: https://x/#/einladung/abc");
+        echo json_encode(['ok' => $ok, 'fehler' => sb_mail_fehler(), 'methode' => sb_mail_methode()]);`], { env: { ...process.env, SB_CONFIG: cfg } });
+      let out = '';
+      p.stdout.on('data', (c) => (out += c));
+      p.on('close', () => res(JSON.parse(out)));
+    });
+  };
+  let r = await run('geheim');
+  assert.deepEqual([r.ok, r.methode], [true, 'smtp']);
+  assert.equal(received.length, 1);
+  const mail = received[0];
+  assert.match(mail, /Subject: =\?UTF-8\?B\?/);
+  const body = Buffer.from(mail.split('\n\n').slice(1).join('').replace(/\s+/g, ''), 'base64').toString('utf8');
+  assert.equal(body, 'Grüße\n.\nLink: https://x/#/einladung/abc');
+  r = await run('falsch');
+  assert.equal(r.ok, false);
+  assert.match(r.fehler, /535.*Benutzer\/Passwort des Postfachs prüfen/);
+  srv.close();
+});
+
 test('KI-Route: Anfrage an Claude und Bereinigung der Antwort', { skip: skip || (!hasVendor && 'vendor/ fehlt (composer install)') }, async () => {
   const r0 = await api('login', { method: 'POST', body: { username: 'admin', password: 'geheim-12345' } });
   const token = r0.data.token;
