@@ -55,7 +55,7 @@ export function renderDatenschutz(view) {
 
     h('h2', '4. Speicherung auf Ihrem Gerät – keine Cookies'),
     h('p', null, `${APP_NAME} setzt keine Cookies und verwendet keine Analyse-, Tracking- oder Werbedienste. Damit die App auch ohne Netz funktioniert, speichert sie Ihre Daten im Speicher des Browsers auf Ihrem Gerät (IndexedDB: Projekte, Inspektionen, Fotos, Einstellungen, Anmeldeschlüssel; Cache: die Dateien der App; localStorage: die zuletzt gewählte Art der Höhenangabe). Diese Speicherung ist für den von Ihnen gewünschten Dienst unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG) und wird nicht zu anderen Zwecken genutzt. Sie können die Daten unter „Einstellungen → Alle lokalen Daten löschen“ oder über die Browsereinstellungen entfernen.`),
-    h('p', null, 'Ihr Standort (GPS) wird nur auf dem Gerät verwendet, um Schächte in der Nähe zu finden bzw. Ihre Position auf der Karte zu zeigen. Er wird nicht an den Server übertragen. Kamera-Fotos werden auf dem Gerät gespeichert und beim Synchronisieren auf den Server Ihrer Firma übertragen.'),
+    h('p', null, 'Ihr Standort (GPS) wird nur auf dem Gerät verwendet, um Schächte in der Nähe zu finden bzw. Ihre Position auf der Karte zu zeigen. Er wird nicht an den Server übertragen. Kamera-Fotos werden auf dem Gerät gespeichert und beim Synchronisieren auf den Server Ihrer Firma übertragen. Ein Bluetooth-Laser wird direkt mit Ihrem Browser verbunden (nur nach Ihrer Auswahl im Dialog des Browsers); die Messwerte landen nur im angetippten Feld.'),
 
     h('h2', '5. Empfänger und Drittdienste'),
     liste(

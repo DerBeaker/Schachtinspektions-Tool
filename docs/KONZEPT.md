@@ -117,7 +117,8 @@ Ehrliche Einordnung – ISYBAU verlangt Lagen auf den Zentimeter (zwei Nachkomma
 |---|---|---|
 | **Aus Stammdaten** (Deckel- minus Sohlhöhe) | so gut wie die Vermessung | ✅ umgesetzt – Tiefen und Anschlusshöhen sind vorbelegt, der Inspekteur prüft/korrigiert |
 | **Messlatte / Zollstock / Lot** | ±1 cm | Standard – Eingabe „ab Deckel“ oder „über Sohle“ |
-| **Laser-Entfernungsmesser mit Bluetooth-Tastaturmodus** (HID, z. B. Leica DISTO mit Keyboard-Modus) | ±2 mm | ✅ funktioniert auf Android **und** iPhone: Das Handy erkennt den Laser wie eine Tastatur, der Messwert landet im angetippten Feld. Die App versteht „2,345“, „2.345 m“, „2345 mm“; Enter springt weiter. Direkte Kopplung per Web Bluetooth ginge nur unter Android/Chrome |
+| **Laser-Entfernungsmesser mit Bluetooth-Tastaturmodus** (HID, z. B. Leica DISTO mit Keyboard-Modus) | ±2 mm | ✅ funktioniert auf Android **und** iPhone: Das Handy erkennt den Laser wie eine Tastatur, der Messwert landet im angetippten Feld. Die App versteht „2,345“, „2.345 m“, „2345 mm“; Enter springt weiter |
+| **Laser direkt per Web Bluetooth** (Beta; Leica DISTO D1/D110/D2/X3/X4, Bosch GLM 50-27 C u. a.) | ±2 mm | ✅ in Chrome/Edge auf Android, Windows, Mac (nicht Safari/iOS): Einstellungen → „Laser verbinden“, der Messwert (BLE-Indication, float32 in m) landet im zuletzt angetippten Maßfeld. Damit gehen auch günstigere Laser ohne Tastaturmodus |
 | **Foto-Schätzung** (zwei Kreise bekannter Größe: Schachthals oben, Schacht-DN unten, Brennweite aus EXIF) | ca. ±10 % | ✅ experimentell umgesetzt („Tiefe schätzen“) – gut als Plausibilitätskontrolle, nicht als Aufmaß |
 | **LiDAR (iPhone Pro / iPad Pro)** | ±1–3 cm bis ca. 5 m | nur mit nativer App möglich |
 | **KI schätzt Tiefe** | grob | nur als Hinweis, nicht für ISYBAU |

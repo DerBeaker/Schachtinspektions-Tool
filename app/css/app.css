@@ -422,3 +422,10 @@ details.erweitert[open] summary { margin-bottom: 10px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .grid4 { grid-template-columns: 1fr 1fr; } }
 .grid3 > * { min-width: 0; }
+
+/* ---------- Bluetooth-Laser ---------- */
+.laser-status.verbunden { color: var(--ok); }
+.laser-status.verbinde { color: var(--accent); animation: pulse 1s infinite; }
+.laser-status.getrennt { color: var(--danger); }
+.laser-ok { color: var(--ok); gap: 6px; }
+.input.laser-neu { box-shadow: 0 0 0 3px var(--ok); transition: box-shadow .2s; }

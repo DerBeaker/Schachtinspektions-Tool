@@ -69,7 +69,7 @@ export async function renderProjects(view) {
       h('h2', hello),
       h('p', projects.length
         ? `${totals.offen} Schächte offen, ${totals.fertig} fertig inspiziert.`
-        : 'Stammdaten (ISYBAU-XML oder DWA-M 150) importieren, Schacht von oben fotografieren, kodieren und als ISYBAU- oder DWA-M-150-Datei abgeben.'),
+        : 'Stammdaten (ISYBAU-XML oder DWA-M 150) importieren, Schacht von oben fotografieren, Maße per Bluetooth-Laser übernehmen, kodieren und als ISYBAU- oder DWA-M-150-Datei abgeben.'),
       h('div', { class: 'row wrap', style: { marginTop: '14px' } },
         btn('Stammdaten importieren', { icon: 'upload', variant: 'primary', onClick: () => importFlow() }),
         !projects.length ? btn('Demo ansehen', { icon: 'sparkles', onClick: loadDemo }) : null)),

@@ -6,6 +6,7 @@ import { REF } from '../data/reflists.js';
 import { normBauteile, hatBauteile, regelschacht, hoehenbilanz } from '../isybau/bauteile.js';
 import { debounce, fmtNum } from '../core/util.js';
 import { FARBEN } from '../components/modell3d.js';
+import { laserKnopf } from '../components/laser.js';
 
 const opt = (list) => [['', '–'], ...list];
 // kurze Beschriftungen für die Formwahl (Werte = ISYBAU G305/G308)
@@ -218,7 +219,8 @@ export function renderAufbau(main, { insp, manhole, changed }) {
         h('div', { class: 'row wrap' },
           btn('Vorlage Regelschacht DN 1000', { icon: 'manhole', variant: 'soft', onClick: vorlage }),
           manhole.bauteile ? btn('Aus Stammdaten', { icon: 'refresh', variant: 'ghost', onClick: ausStamm }) : null),
-        h('p', { class: 'muted small' }, 'Die Bauteile gehen als ISYBAU-Stammdaten (Knoten/Schacht) bzw. DWA-M-150-Felder in den Export und ins Schachtprotokoll. Maße wie im Austauschformat in m, Auflageringe in cm – Laser-Eingabe funktioniert in jedem Maßfeld.'))),
+        h('p', { class: 'muted small' }, 'Die Bauteile gehen als ISYBAU-Stammdaten (Knoten/Schacht) bzw. DWA-M-150-Felder in den Export und ins Schachtprotokoll. Maße wie im Austauschformat in m, Auflageringe in cm – der Bluetooth-Laser trägt in jedes Maßfeld ein.'),
+        laserKnopf())),
     formEl));
   renderForm();
   renderBilanz();

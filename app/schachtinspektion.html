@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Schachtinspektion per App – kostenlos | Schachtblick</title>
-  <meta name="description" content="Kostenlose App für die Schachtinspektion: Schacht von oben fotografieren, Anschlüsse und Schäden nach DIN EN 13508-2 (ISYBAU, DWA-M 149-2) kodieren, Zustandsklassen nach BFR Abwasser, PDF-Schachtprotokoll und Aufmaß. Im Browser, ohne Installation, auch offline.">
+  <meta name="description" content="Kostenlose App für die Schachtinspektion: Schacht von oben fotografieren, Anschlüsse und Schäden nach DIN EN 13508-2 (ISYBAU, DWA-M 149-2) kodieren, Maße per Bluetooth-Laser, Zustandsklassen nach BFR Abwasser, PDF-Schachtprotokoll und Aufmaß. Im Browser, ohne Installation, auch offline.">
   <link rel="canonical" href="https://schachtblick.mmse-software.com/schachtinspektion.html">
   <meta name="theme-color" content="#0a5bd3">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -13,7 +13,7 @@
   <meta property="og:locale" content="de_DE">
   <meta property="og:site_name" content="Schachtblick">
   <meta property="og:title" content="Schachtinspektion per App – kostenlos | Schachtblick">
-  <meta property="og:description" content="Schacht fotografieren, Anschlüsse und Schäden kodieren, Zustandsklasse und PDF-Protokoll – nach ISYBAU und DWA-M 149-2. Im Browser, ohne Installation.">
+  <meta property="og:description" content="Schacht fotografieren, Anschlüsse und Schäden kodieren, Maße per Bluetooth-Laser, Zustandsklasse und PDF-Protokoll – nach ISYBAU und DWA-M 149-2. Im Browser, ohne Installation.">
   <meta property="og:url" content="https://schachtblick.mmse-software.com/schachtinspektion.html">
   <meta property="og:image" content="https://schachtblick.mmse-software.com/og-bild.jpg">
   <meta property="og:image:width" content="1200">
@@ -26,7 +26,17 @@
     "@type": "SoftwareApplication",
     "name": "Schachtblick",
     "url": "https://schachtblick.mmse-software.com/",
-    "description": "Web-App für die Inspektion von Abwasserschächten nach ISYBAU (BFR Abwasser) und DWA-M 149-2 (DIN EN 13508-2): Foto von oben, Kodierung von Anschlüssen und Schäden, Zustandsklassen, PDF-Schachtprotokoll, Aufmaß, Export als ISYBAU-XML und DWA-M 150.",
+    "description": "Web-App für die Inspektion von Abwasserschächten nach ISYBAU (BFR Abwasser) und DWA-M 149-2 (DIN EN 13508-2): Foto von oben, Kodierung von Anschlüssen und Schäden, Maße per Bluetooth-Laser, Zustandsklassen, PDF-Schachtprotokoll, Aufmaß, Export als ISYBAU-XML und DWA-M 150.",
+    "featureList": [
+      "Schachtfoto von oben mit Uhr und Anschlüssen",
+      "Kodierung nach DIN EN 13508-2 (ISYBAU, DWA-M 149-2)",
+      "Laser-Entfernungsmesser per Bluetooth (Tastaturmodus oder direkt verbunden)",
+      "Zustandsklassen nach BFR Abwasser Anhang A-3",
+      "PDF-Schachtprotokoll und Aufmaß (PDF, Excel)",
+      "Bauteilbeschreibung mit 3D-Schachtmodell",
+      "Import und Export ISYBAU-XML 2006–2024 und DWA-M 150",
+      "offline nutzbar"
+    ],
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web-Browser (Android, iOS, Windows, macOS)",
     "inLanguage": "de",
@@ -75,6 +85,8 @@
     figcaption { color: var(--muted); font-size: .9rem; margin-top: 6px; }
     .preis { font-size: 1.8rem; font-weight: 800; }
     .pro { border: 2px solid var(--primary); }
+    .karte.laser { border: 2px solid var(--primary); background: var(--primary-soft); }
+    .karte.laser p { color: var(--text); }
     ul.haken { list-style: none; padding: 0; margin: 10px 0 0; }
     ul.haken li { padding-left: 26px; position: relative; margin: 4px 0; font-size: .95rem; }
     ul.haken li::before { content: "✓"; position: absolute; left: 4px; color: var(--ok); font-weight: 800; }
@@ -98,7 +110,7 @@
     <div class="hero">
       <div>
         <h1>Schachtinspektion per App – kostenlos im Browser</h1>
-        <p class="lead">Schacht von oben fotografieren, Anschlüsse antippen, Schäden kodieren – mit Zustandsklasse, PDF-Schachtprotokoll und Aufmaß. Nach ISYBAU (BFR Abwasser) und DWA-M 149-2. Ohne Installation, ohne Anmeldung, auch ohne Netz.</p>
+        <p class="lead">Schacht von oben fotografieren, Anschlüsse antippen, Schäden kodieren, Maße mit dem Bluetooth-Laser übernehmen – mit Zustandsklasse, PDF-Schachtprotokoll und Aufmaß. Nach ISYBAU (BFR Abwasser) und DWA-M 149-2. Ohne Installation, ohne Anmeldung, auch ohne Netz.</p>
         <div class="knoepfe">
           <a class="btn btn-hell" href="./">App kostenlos starten</a>
           <a class="btn btn-rand" href="./#/pro">Tarife ansehen</a>
@@ -116,7 +128,8 @@
     <ol class="schritte">
       <li><b>Stammdaten importieren:</b> ISYBAU-XML (2006, 2013, 2017, 2024) oder DWA-M 150 – Schächte, Tiefen und Haltungen sind sofort da, auf Wunsch mit der letzten Inspektion. Ohne Datei legen Sie Schächte einfach von Hand an.</li>
       <li><b>Foto von oben:</b> Die Uhr wird auf den Schacht gelegt, der Auslauf steht bei 12 Uhr. Anschlüsse tippen Sie direkt im Foto an; Lage und Höhe aus den Stammdaten werden zugeordnet.</li>
-      <li><b>Schäden kodieren:</b> Katalog nach DIN EN 13508-2 mit nationaler Festlegung (BFR Abwasser 01/2025 bzw. DWA-M 149-2), Plausibilitätsprüfung, Strecken­schäden, Uhrzeiger-Lage, Messwerte vom Bluetooth-Laser.</li>
+      <li><b>Messen mit dem Laser:</b> Schachttiefe, Lage der Schäden, Bauteilmaße – Feld antippen, am Bluetooth-Laser auslösen, der Wert steht im Feld und der Cursor springt weiter. Kein Abtippen, keine Zettel.</li>
+      <li><b>Schäden kodieren:</b> Katalog nach DIN EN 13508-2 mit nationaler Festlegung (BFR Abwasser 01/2025 bzw. DWA-M 149-2), Plausibilitätsprüfung, Strecken­schäden, Uhrzeiger-Lage.</li>
       <li><b>Ergebnis abgeben:</b> Zustandsklasse nach BFR Abwasser Anhang A-3, PDF-Schachtprotokoll mit Ihrem Logo, Aufmaß als PDF oder Excel – und mit Pro die Austauschdatei für den Auftraggeber.</li>
     </ol>
   </section>
@@ -133,6 +146,7 @@
   <section>
     <h2>Was Schachtblick kann</h2>
     <div class="karten">
+      <div class="karte laser"><h3>Bluetooth-Laser</h3><p>Messwerte direkt vom Laser-Entfernungsmesser ins angetippte Feld – im Tastaturmodus auf jedem Handy (auch iPhone), günstige Leica- und Bosch-Laser auch direkt verbunden.</p></div>
       <div class="karte"><h3>Kodierung nach Norm</h3><p>DIN EN 13508-2 mit ISYBAU- bzw. DWA-M-149-2-Festlegung, Prüfung der Pflichtangaben wie im Kodierhandbuch.</p></div>
       <div class="karte"><h3>Zustandsklassen</h3><p>Bewertung je Befund und Objektklasse 0–5 nach BFR Abwasser Anhang A-3.</p></div>
       <div class="karte"><h3>Bauteile &amp; 3D</h3><p>Abdeckung, Auflageringe, Konus, Unterteil, Gerinne, Steighilfen – mit Höhenbilanz und 3D-Modell.</p></div>
@@ -149,7 +163,7 @@
         <h3>Schachtblick Basis</h3>
         <div class="preis">kostenlos</div>
         <p>ohne Anmeldung – alle Daten bleiben auf Ihrem Gerät</p>
-        <ul class="haken"><li>Import, Foto, Kodierung, Zustandsklassen</li><li>PDF-Schachtprotokoll und Aufmaß</li><li>Bauteile, 3D-Modell, Karte</li></ul>
+        <ul class="haken"><li>Import, Foto, Kodierung, Zustandsklassen</li><li>Messen mit dem Bluetooth-Laser</li><li>PDF-Schachtprotokoll und Aufmaß</li><li>Bauteile, 3D-Modell, Karte</li></ul>
       </div>
       <div class="karte pro">
         <h3>Schachtblick Pro</h3>
@@ -167,6 +181,7 @@
     <details><summary>Muss ich etwas installieren?</summary><p>Nein. Schachtblick läuft im Browser (Chrome, Safari, Edge, Firefox). Auf dem Handy können Sie die App über „Zum Startbildschirm hinzufügen“ wie eine normale App starten.</p></details>
     <details><summary>Wo liegen meine Daten?</summary><p>In Basis ausschließlich im Speicher des Browsers auf Ihrem Gerät – niemand sonst kann sie sehen. Mit Pro zusätzlich im Firmenkonto auf einem Server in Deutschland; jede Firma sieht nur ihre eigenen Daten. Mehr in den <a href="./#/datenschutz">Datenschutzhinweisen</a>.</p></details>
     <details><summary>Welche Formate werden unterstützt?</summary><p>Import: ISYBAU-XML 2006, 2013, 2017, 2024 und DWA-M 150, jeweils auch mit Vorinspektionen. Export (Pro): ISYBAU-XML 2006, 2013, 2017, 2024 – geprüft gegen die offiziellen XSD-Schemata – und DWA-M 150 Typ B, jeweils mit Fotos als ZIP.</p></details>
+    <details><summary>Welche Laser-Entfernungsmesser funktionieren?</summary><p><b>Mit Tastaturmodus</b> (Bluetooth-HID) – auf Android, iPhone, Tablet und PC: z. B. Leica DISTO X3, X4, D5 oder Stabila LD 530 BT. Der Laser wird in den Bluetooth-Einstellungen wie eine Tastatur gekoppelt; Schachtblick versteht „2,345“, „2.345 m“ und „2345 mm“. <b>Direkt verbunden</b> (Beta, Chrome oder Edge auf Android, Windows, Mac): auch günstigere Laser ohne Tastaturmodus, z. B. Leica DISTO D1, D110, D2 oder Bosch GLM 50-27 C – in der App unter Einstellungen → „Laser verbinden“. Safari auf iPhone/iPad kann keine direkte Bluetooth-Verbindung; dort bitte einen Laser mit Tastaturmodus verwenden.</p></details>
     <details><summary>Funktioniert das auch ohne Netz im Schacht?</summary><p>Ja. Nach dem ersten Aufruf arbeitet die App offline. Mit Pro wird automatisch abgeglichen, sobald wieder Netz da ist.</p></details>
   </section>
 

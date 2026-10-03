@@ -98,8 +98,8 @@ await og.setContent(`<!doctype html><meta charset="utf-8"><style>
 <div class="txt">
   <div class="marke"><div class="logo"><svg viewBox="0 0 100 100" width="40" height="40"><g fill="none" stroke="#fff" stroke-width="7"><circle cx="50" cy="50" r="42"/><circle cx="50" cy="50" r="24"/><path d="M50 4v16M50 80v16M4 50h16M80 50h16"/></g></svg></div>Schachtblick</div>
   <h1>Schachtinspektion per App – kostenlos</h1>
-  <p>Foto von oben, Anschlüsse und Schäden kodieren, Zustandsklasse, PDF-Protokoll. Im Browser, ohne Installation.</p>
-  <div class="chips"><span class="chip">ISYBAU</span><span class="chip">DWA-M 149-2</span><span class="chip">DWA-M 150</span><span class="chip">offline</span></div>
+  <p>Foto von oben, Anschlüsse und Schäden kodieren, Maße per Bluetooth-Laser, Zustandsklasse, PDF-Protokoll. Im Browser, ohne Installation.</p>
+  <div class="chips"><span class="chip">ISYBAU</span><span class="chip">DWA-M 149-2</span><span class="chip">DWA-M 150</span><span class="chip">Bluetooth-Laser</span><span class="chip">offline</span></div>
 </div>
 <div class="handy"><img src="data:image/jpeg;base64,${foto}"></div>
 <div class="fuss">MMSE Software Engineering · www.mmse-software.com</div>`);

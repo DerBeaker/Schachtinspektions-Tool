@@ -78,6 +78,7 @@ const P = {
   wifiOff: 'M3 3l18 18M8.5 16.5a5 5 0 017 0M5 12.5a10 10 0 0110-2.5M2 8.8A15 15 0 0110 5M12 20h.01',
   heart: 'M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.6 1-1.1a5.5 5.5 0 000-7.7z',
   lock: 'M6 11h12v10H6zM8 11V7a4 4 0 018 0v4',
+  bluetooth: 'M7 7l10 10-5 5V2l5 5L7 17',
   star: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z',
 };
 
@@ -207,7 +208,8 @@ export function input(value, onInput, attrs = {}) {
 }
 
 /** Fokus auf das nächste Eingabefeld im selben Dialog bzw. in derselben Ansicht. */
-function focusNext(el) {
+/** Fokus ins nächste Eingabefeld (Enter, Laser). */
+export function focusNext(el) {
   const scope = el.closest('.sheet, form, .main') || document.body;
   const list = [...scope.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([disabled]), select, textarea')]
     .filter((x) => x.offsetParent !== null);
@@ -216,7 +218,8 @@ function focusNext(el) {
 }
 
 /**
- * Zahleneingabe mit Dezimalkomma. `unit: 'm'|'mm'` erlaubt Werte mit Einheit (Laser);
+ * Zahleneingabe mit Dezimalkomma. `unit: 'm'|'cm'|'mm'` erlaubt Werte mit Einheit (Laser im Tastaturmodus)
+ * und macht das Feld zum Ziel für den direkt verbundenen Laser;
  * Enter übernimmt den Wert und springt ins nächste Feld.
  */
 export function numInput(value, onInput, { unit, ...attrs } = {}) {
@@ -224,6 +227,7 @@ export function numInput(value, onInput, { unit, ...attrs } = {}) {
   return h('input', {
     class: 'input', type: 'text', inputmode: 'decimal', autocomplete: 'off', enterkeyhint: 'next',
     value: show(value),
+    'data-laser': ['m', 'cm', 'mm'].includes(unit) ? unit : null, // Ziel für den Bluetooth-Laser (core/laser.js)
     oninput: (e) => {
       const v = parseMeasure(e.target.value, unit);
       if (v !== null) onInput(v);

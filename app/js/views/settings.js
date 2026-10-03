@@ -1,4 +1,4 @@
-// Einstellungen: Inspekteur, Firma (für Berichte), Darstellung, Firmenkonto (Anmeldung, Abo), Speicher, Über.
+// Einstellungen: Inspekteur, Bluetooth-Laser, Firma (für Berichte), Darstellung, Firmenkonto (Anmeldung, Abo), Speicher, Über.
 
 import { h, clear, btn, icon, toast, field, input, select, toggle, confirmDialog, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
@@ -11,6 +11,7 @@ import { pickFile } from '../lib/image.js';
 import { debounce, fmtDate } from '../core/util.js';
 import { rechtsLinks } from './rechtliches.js';
 import { planText, spendenLink, weiterempfehlen } from './konto.js';
+import { laserKarte } from '../components/laser.js';
 
 export function lizenzText(l) {
   const teile = [];
@@ -281,6 +282,7 @@ export async function renderSettings(view) {
         h('h3', 'Inspekteur'),
         field('Name des Inspekteurs', input(s.inspector, set('inspector'), { autocomplete: 'name', placeholder: 'Vor- und Nachname' }), 'Wird in jede neue Inspektion übernommen (ISYBAU „NameUntersucher“).'),
         field('Höhenangaben für neue Projekte', select(s.bezugVertikal || '1', BEZUG_VERTIKAL, set('bezugVertikal')), 'Pro Projekt unter „Projekt & Auftrag“ änderbar.')),
+      laserKarte(),
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Firma (Kopf der Berichte)'),
         zentral ? h('p', { class: 'muted small row' }, icon('cloud', 16), h('span', darfFirma

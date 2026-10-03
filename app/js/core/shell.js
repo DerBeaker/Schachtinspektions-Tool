@@ -2,6 +2,7 @@
 
 import { h, btn, icon } from './ui.js';
 import { sync } from '../sync.js';
+import { laserAnzeige } from '../components/laser.js';
 
 export function navigate(hash, { replace = false } = {}) {
   if (replace) history.replaceState(null, '', hash);
@@ -17,6 +18,7 @@ export function topbar({ back, title, sub, actions = [], brand = false }) {
         h('div', { class: 'brand-mark' }, icon('manhole', 22)),
         h('div', { class: 'grow' }, h('h1', 'Schachtblick'), h('div', { class: 'sub' }, sub || 'Schachtinspektion nach ISYBAU & DWA')))
       : h('div', { class: 'title' }, h('h1', title), sub ? h('div', { class: 'sub' }, sub) : null),
+    laserAnzeige(),
     syncIndicator(),
     ...actions);
 }

@@ -21,6 +21,7 @@ import { debounce, fmtNum, fmtM, fmtDate, clockLabel, uid, num } from '../core/u
 import { navUrl } from '../lib/geo.js';
 import { runAiAnalysis, aiAvailable } from './ai.js';
 import { renderAufbau } from './aufbau.js';
+import { laserKnopf } from '../components/laser.js';
 
 const TABS = [['foto', 'Foto', 'camera'], ['anschluesse', 'Anschlüsse', 'target'], ['aufbau', 'Aufbau', 'layers'], ['befunde', 'Befunde', 'list'], ['daten', 'Daten', 'file']];
 
@@ -455,7 +456,8 @@ export async function renderInspection(view, manholeId, params) {
                 ? `Anfang am Deckel = 0,00 m, Ende an der Sohle = ${t}. Eingaben „ab Deckel“ oder „über Sohle“ werden umgerechnet.`
                 : `Anfang an der Sohle (tiefster Auslauf) = 0,00 m, Ende am Deckel = ${t}. Eingaben „ab Deckel“ oder „über Sohle“ werden umgerechnet.`;
             })()),
-          h('p', { class: 'muted small row' }, icon('info', 16), h('span', 'Laser mit Bluetooth-Tastaturmodus: Feld antippen, am Gerät messen – der Wert wird eingetragen (auch „2345 mm“ oder „2,345 m“), Enter springt weiter.')),
+          h('p', { class: 'muted small row' }, icon('bluetooth', 16), h('span', 'Bluetooth-Laser: Feld antippen, am Gerät messen – der Wert wird eingetragen und der Cursor springt weiter. Im Tastaturmodus (z. B. Leica DISTO X3/X4) auch „2345 mm“ oder „2,345 m“. ', h('a', { href: '#/settings' }, 'Laser einrichten'))),
+          laserKnopf(),
           h('div', { class: 'grid2' },
             field('Innenschutz', select(insp.innenschutz, [['', '–'], ...REF.G103], set('innenschutz'))),
             field('Auskleidung', select(insp.artAuskleidung, [['', '–'], ...REF.U114], set('artAuskleidung'))))),

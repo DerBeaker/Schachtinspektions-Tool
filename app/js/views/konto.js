@@ -129,6 +129,7 @@ export async function renderPro(view) {
         planListe([
           [true, 'Stammdaten importieren (ISYBAU 2006–2024, DWA-M 150)'],
           [true, 'Schächte fotografieren, Anschlüsse und Schäden kodieren'],
+          [true, 'Maße per Bluetooth-Laser direkt ins Feld'],
           [true, 'Zustandsklassen nach BFR Abwasser, Bauteile, 3D-Modell, Karte'],
           [true, 'Schachtprotokolle (PDF) und Aufmaß (PDF/Excel)'],
           [true, 'Daten nur auf diesem Gerät – niemand sonst sieht sie'],
