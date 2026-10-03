@@ -126,6 +126,24 @@ if (!(await mia.getByLabel('Anschrift').isDisabled())) errors.push('Inspekteurin
 if (await mia.getByRole('button', { name: 'Betreiber-Bereich' }).count()) errors.push('Betreiber-Bereich für Inspekteurin sichtbar');
 await mia.screenshot({ path: `${outDir}/05-inspekteurin-firmendaten.png`, fullPage: true });
 
+step('Firmen-Admin am PC: anmelden – Logo, Firmendaten und Abgleich ohne Neuladen');
+{
+  const pc = await neu(null, 'admin-pc');
+  await login(pc, 'chef@mueller.test', 'chef-pass-1');
+  // Firma-Karte zeigt sofort die Daten vom Server (früher erst nach dem Neuladen)
+  if (await pc.getByLabel('Anschrift').inputValue() !== 'Hauptstraße 1\n12345 Musterstadt') errors.push('PC: Anschrift erst nach Neuladen sichtbar');
+  if (!(await pc.locator('img.logo-preview').count())) errors.push('PC: Logo erst nach Neuladen sichtbar');
+  // Statuszeile bleibt nicht bei „Synchronisiere …“ stehen
+  await pc.getByText(/^Synchronisiert \d/).waitFor({ timeout: 20000 }).catch(() => errors.push('PC: Statuszeile meldet kein Ende des Abgleichs'));
+  await pc.getByText(/Abgleich fertig/).waitFor({ timeout: 5000 }).catch(() => errors.push('PC: keine Meldung nach dem ersten Abgleich'));
+  // nach dem Neuladen weiterhin angemeldet (früher erschien das Anmeldeformular)
+  await pc.reload();
+  await pc.getByRole('button', { name: 'Abmelden' }).waitFor({ timeout: 5000 }).catch(() => errors.push('PC: nach dem Neuladen scheinbar abgemeldet'));
+  if (await pc.getByLabel('Passwort', { exact: true }).count()) errors.push('PC: Anmeldeformular nach dem Neuladen');
+  await pc.screenshot({ path: `${outDir}/05b-admin-pc-nach-neuladen.png`, fullPage: true });
+  await pc.context().close();
+}
+
 step('Betreiber: Übersicht, Lizenz ablaufen lassen');
 await op.goto(url + '#/betrieb');
 await op.getByText('2 von 3 Benutzer').waitFor();

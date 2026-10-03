@@ -145,6 +145,7 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
 | „Der Server konnte keine E-Mail senden“ | SMTP in `config.php` eintragen (Schritt 4); im Betreiber-Bereich „E-Mail-Versand testen“ zeigt den Grund. Bis dahin den angezeigten Link weitergeben |
 | Mail verschickt, kommt aber nicht an | Spam-Ordner prüfen; Absender (`mail_from`) = SMTP-Postfach |
 | App bleibt bei „Schachtblick wird geladen …“ | Nach einem Update lagen noch alte Dateien im Browser. Nach wenigen Sekunden erscheint „Neu laden“ – antippen. Ab Version 0.5.5 prüft der Browser die Programmdateien bei jedem Start (`.htaccess` mit hochladen!) |
+| Nach dem Anmelden erscheinen Logo/Firmendaten erst nach dem Neuladen, nach dem Neuladen wirkt man abgemeldet, Status bleibt bei „Synchronisiere …“ | Behoben in 0.6.1 – Version hochladen, App einmal neu laden |
 | Kartenhintergrund fehlt | Internetverbindung nötig (basemap.de / OpenStreetMap); Schächte werden trotzdem angezeigt |
 | `api/lib/` im Browser erreichbar | `.htaccess`-Dateien wurden nicht hochgeladen (versteckte Dateien anzeigen) |
 

@@ -424,13 +424,16 @@ test('E-Mail per SMTP (Anmeldung, Umlaute, falsches Passwort)', { skip: !hasPhp 
         $ok = sb_mail('empfaenger@test.de', 'Einladung für Müller & Söhne', "Grüße\n.\nLink: https://x/#/einladung/abc");
         echo json_encode(['ok' => $ok, 'fehler' => sb_mail_fehler(), 'methode' => sb_mail_methode()]);`], { env: { ...process.env, SB_CONFIG: cfg } });
       let out = '';
+      let err = '';
       p.stdout.on('data', (c) => (out += c));
-      p.on('close', () => res(JSON.parse(out)));
+      p.stderr.on('data', (c) => (err += c));
+      // bei unerwarteter Ausgabe den Rohtext zeigen statt einer unklaren Ausnahme
+      p.on('close', (code) => { try { res(JSON.parse(out)); } catch { res({ ok: null, roh: out, stderr: err, code }); } });
     });
   };
   let r = await run('geheim');
-  assert.deepEqual([r.ok, r.methode], [true, 'smtp']);
-  assert.equal(received.length, 1);
+  assert.deepEqual([r.ok, r.methode], [true, 'smtp'], JSON.stringify(r));
+  assert.equal(received.length, 1, JSON.stringify(r));
   const mail = received[0];
   assert.match(mail, /Subject: =\?UTF-8\?B\?/);
   const body = Buffer.from(mail.split('\n\n').slice(1).join('').replace(/\s+/g, ''), 'base64').toString('utf8');

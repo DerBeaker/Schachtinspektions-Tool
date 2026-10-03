@@ -65,6 +65,7 @@ window.addEventListener('app:route', route);
 async function init() {
   const s = await getSettings();
   if (s.theme) document.documentElement.dataset.theme = s.theme;
+  try { await sync.load(); } catch (e) { console.error(e); } // Anmeldung kennen, bevor gezeichnet wird
   await route();
   window.__sbGestartet = true; // für die Startprüfung in index.html
   sync.init();

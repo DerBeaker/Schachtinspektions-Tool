@@ -77,6 +77,18 @@ export async function renderSettings(view) {
   const setFirma = (k) => (v) => { s[k] = v; save(); pushFirma(); };
   const main = h('main', { class: 'main' });
   const serverBox = h('div', { class: 'card card-pad stack' });
+  // ganze Seite neu zeichnen (nach An-/Abmeldung, neue Firmendaten vom Server)
+  const neuZeichnen = () => window.dispatchEvent(new Event('app:route'));
+  // Statuszeile des Abgleichs live nachführen
+  const statusEl = h('div', { class: 'muted small', 'aria-live': 'polite' });
+  const unsub = sync.subscribe((st) => { statusEl.textContent = st.message || ''; });
+  const firmaNeu = async () => {
+    const n = await getSettings();
+    if (['company', 'companyAddress', 'companyContact', 'logo'].some((k) => (n[k] || '') !== (s[k] || ''))) neuZeichnen();
+    else s.firmaStand = n.firmaStand;
+  };
+  window.addEventListener('app:firma', firmaNeu);
+  const fotoFehlerEl = h('div');
   const storageEl = h('div', { class: 'muted small' }, '…');
 
   function renderServer() {
@@ -88,7 +100,8 @@ export async function renderSettings(view) {
           h('div', { class: 'grow' }, h('h3', u.name || u.username), h('div', { class: 'muted small' }, `${u.tenant || ''}${sync.auth.serverUrl ? ` · ${sync.auth.serverUrl}` : ''}`))),
         l ? h('div', { class: ['issue', sync.abgelaufen() ? 'warn' : 'ok'] }, icon(sync.abgelaufen() ? 'alert' : 'star', 18), h('span', planText(l))) : null,
         l?.vertragOffen && u.role === 'admin' ? h('div', { class: 'issue warn' }, icon('file', 18), h('span', 'Bitte Nutzungsbedingungen und AVV bestätigen (Abo & Verträge).')) : null,
-        h('div', { class: 'muted small' }, sync.status.message || ''),
+        statusEl,
+        fotoFehlerEl,
         u.role === 'admin' && l ? h('div', { class: 'muted small' }, lizenzText(l)) : null,
         sync.auth.features?.ai ? h('div', { class: 'badge badge-ai' }, '✦ KI-Assistent verfügbar') : null,
         h('div', { class: 'row wrap' },
@@ -98,7 +111,12 @@ export async function renderSettings(view) {
           u.operator ? btn('Betreiber-Bereich', { icon: 'layers', variant: 'soft', onClick: () => navigate('#/betrieb') }) : null,
           u.operator ? btn('E-Mail-Versand testen', { icon: 'upload', variant: 'ghost', onClick: mailTestDialog }) : null,
           btn('Passwort ändern', { variant: 'ghost', onClick: passwordSheet }),
-          btn('Abmelden', { icon: 'logout', variant: 'ghost', onClick: async () => { await sync.logout(); renderServer(); } })));
+          btn('Abmelden', { icon: 'logout', variant: 'ghost', onClick: async () => { await sync.logout(); neuZeichnen(); } })));
+      statusEl.textContent = sync.status.message || '';
+      db.all('photos').then((ps) => {
+        const n = ps.filter((p) => p.uploadFehler && !p.uploaded).length;
+        clear(fotoFehlerEl, n ? h('div', { class: 'issue warn' }, icon('alert', 18), h('span', `${n} Foto(s) hat der Server abgelehnt (z. B. zu groß) – sie bleiben nur auf diesem Gerät.`)) : null);
+      }).catch(() => {});
       return;
     }
     const d = { url: s.serverUrl || '', user: '', pass: '' };
@@ -118,8 +136,13 @@ export async function renderSettings(view) {
           try {
             s.serverUrl = d.url.trim(); await save();
             await sync.login(s.serverUrl, d.user.trim(), d.pass);
-            toast('Angemeldet – Synchronisation läuft.', 'ok');
-            renderServer();
+            toast('Angemeldet – Daten werden abgeglichen …', 'ok');
+            // nach dem ersten Abgleich Bescheid geben
+            sync.running?.then(() => {
+              if (sync.status.state === 'ok') toast('Abgleich fertig – alle Daten sind auf diesem Gerät.', 'ok', 4000);
+              else if (sync.status.state === 'error') toast('Abgleich: ' + sync.status.message, 'error', 6000);
+            });
+            neuZeichnen(); // Firmendaten und Logo vom Server gleich anzeigen
           } catch (e) { toast('Anmeldung fehlgeschlagen: ' + e.message, 'error', 6000); }
         } }),
         btn('Passwort vergessen?', { variant: 'ghost', onClick: () => passwortVergessen(d.url.trim(), d.user.trim()) })),
@@ -311,4 +334,5 @@ export async function renderSettings(view) {
   renderServer();
   const info = await storageInfo();
   storageEl.textContent = info ? `${(info.used / 1048576).toFixed(1)} MB belegt von ca. ${(info.quota / 1073741824).toFixed(1)} GB verfügbar` : 'Speicherinfo nicht verfügbar.';
+  return () => { unsub(); window.removeEventListener('app:firma', firmaNeu); };
 }

@@ -32,7 +32,14 @@ export const DEFAULT_SETTINGS = {
 export async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(await db.getMeta('settings', {})) };
 }
+// Firmendaten kommen bei angemeldeter Firma vom Server (sync.applyFirma, zählt firmaStand hoch).
+// Eine Ansicht mit einer älteren Kopie der Einstellungen darf sie beim Speichern nicht zurückdrehen.
+const FIRMA_FELDER = ['company', 'companyAddress', 'companyContact', 'logo', 'firmaZentral', 'firmaStand'];
 export async function saveSettings(s) {
+  const alt = await db.getMeta('settings', {});
+  if ((alt.firmaStand || 0) > (s.firmaStand || 0)) {
+    for (const k of FIRMA_FELDER) { if (k in alt) s[k] = alt[k]; else delete s[k]; }
+  }
   await db.setMeta('settings', s);
   emit('settings', s);
 }

@@ -41,7 +41,7 @@ export const sync = {
     const ct = res.headers.get('content-type') || '';
     if (!res.ok) {
       const msg = ct.includes('json') ? (await res.json()).error : await res.text();
-      throw new Error(msg || `Serverfehler ${res.status}`);
+      throw Object.assign(new Error(msg || `Serverfehler ${res.status}`), { status: res.status });
     }
     return ct.includes('json') ? res.json() : res.blob();
   },
@@ -136,14 +136,17 @@ export const sync = {
         f = r.firma;
       } else {
         if (!s.company) s.company = f.name;
-        s.firmaZentral = true;
+        Object.assign(s, { firmaZentral: true, firmaStand: (s.firmaStand || 0) + 1 });
         await saveSettings(s);
+        window.dispatchEvent(new CustomEvent('app:firma'));
         return;
       }
     }
-    Object.assign(s, { company: f.name, companyAddress: f.anschrift || '', companyContact: f.kontakt || '', logo: f.logo || '', firmaZentral: true });
+    // firmaStand: ältere Kopien der Einstellungen überschreiben diese Daten nicht mehr (store.saveSettings)
+    Object.assign(s, { company: f.name, companyAddress: f.anschrift || '', companyContact: f.kontakt || '', logo: f.logo || '', firmaZentral: true, firmaStand: (s.firmaStand || 0) + 1 });
     await saveSettings(s);
     await db.setMeta('firmaUpdated', f.updated || 0);
+    window.dispatchEvent(new CustomEvent('app:firma'));
   },
 
   async saveFirma(f) {
@@ -152,10 +155,16 @@ export const sync = {
     return r;
   },
 
-  async init() {
+  /** Gespeicherte Anmeldung lesen – vor dem ersten Bildschirm, damit er gleich angemeldet erscheint. */
+  async load() {
     this.auth = await db.getMeta('auth', null);
     const lastSync = await db.getMeta('lastSync', null);
     this.set({ enabled: !!this.auth, lastSync });
+    this._geladen = true;
+  },
+
+  async init() {
+    if (!this._geladen) await this.load();
     // Listener immer registrieren – run() tut ohne Anmeldung nichts
     const later = debounce(() => this.run(), 4000);
     onChange(() => later());
@@ -186,12 +195,21 @@ export const sync = {
     const nurLesen = this.abgelaufen();
     try {
       // 1. Fotos hochladen (Binärdaten zuerst, damit Referenzen gültig sind)
-      const photos = nurLesen ? [] : (await db.all('photos')).filter((p) => !p.uploaded && p.blob);
+      const photos = nurLesen ? [] : (await db.all('photos')).filter((p) => !p.uploaded && p.blob && !p.uploadFehler);
+      let nr = 0;
       for (const p of photos) {
-        await this.request('photo', { method: 'PUT', query: { id: p.id, inspection: p.inspectionId, project: p.projectId, w: p.width || 0, h: p.height || 0 }, body: p.blob, raw: true });
-        p.uploaded = true;
+        if (photos.length > 1) this.set({ message: `Lade Fotos hoch (${++nr} von ${photos.length}) …` });
+        try {
+          await this.request('photo', { method: 'PUT', query: { id: p.id, inspection: p.inspectionId, project: p.projectId, w: p.width || 0, h: p.height || 0 }, body: p.blob, raw: true });
+          p.uploaded = true;
+        } catch (e) {
+          // vom Server abgelehnt (zu groß, kein JPEG …): merken und weitermachen, statt den Abgleich zu blockieren
+          if (!e.status || e.status < 400 || e.status >= 500 || e.status === 401 || e.status === 403) throw e;
+          p.uploadFehler = e.message;
+        }
         await db.put('photos', p);
       }
+      if (photos.length) this.set({ message: 'Gleiche Daten ab …' });
       // 2. Datensätze austauschen
       const changes = [];
       const pushed = [];
