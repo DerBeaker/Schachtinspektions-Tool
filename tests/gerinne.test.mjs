@@ -1,7 +1,7 @@
 // Gerinne im 3D-Modell: Verlauf vom Hauptzulauf zum Auslauf (gerade oder im Bogen), Wahl des Hauptzulaufs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gerinneVerlauf, gerinneAnschluesse, nebenGerinneVerlauf, nebenGerinne, bermeUmrisse } from '../app/js/components/modell3d.js';
+import { gerinneVerlauf, gerinneAnschluesse, nebenGerinneVerlauf, nebenGerinne, bermeUmrisse, wandMitOeffnungen } from '../app/js/components/modell3d.js';
 
 const r = 0.5, w = 0.15;
 const nah = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -98,4 +98,35 @@ test('Nebengerinne nur für Zuläufe auf Höhe der Berme, nicht für den Hauptzu
   const [ex, ez] = neben[0].achse.at(-1);
   assert.ok(Math.abs(ex) > 0.04, 'endet am Rand des Hauptgerinnes, nicht in dessen Mitte');
   assert.ok(Math.abs(ex) < 0.15 && Math.abs(ez) < r);
+});
+
+// Fläche aller Dreiecke (x/y/z flach) und Schwerpunkte
+function dreiecke(pos) {
+  const out = [];
+  for (let i = 0; i < pos.length; i += 9) {
+    const a = pos.slice(i, i + 3), b = pos.slice(i + 3, i + 6), c = pos.slice(i + 6, i + 9);
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    out.push({ flaeche: Math.hypot(...n) / 2, mitte: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3] });
+  }
+  return out;
+}
+
+test('Wand mit Rohröffnungen: Löcher ausgespart, Fläche stimmt, Öffnung an der Schnittkante halbiert', () => {
+  const R = 0.5, y0 = 0, y1 = 0.6;
+  const voll = dreiecke(wandMitOeffnungen({ R, theta0: Math.PI, theta1: Math.PI * 2.5, y0, y1 }).pos).reduce((a, d) => a + d.flaeche, 0);
+  assert.ok(Math.abs(voll - R * Math.PI * 1.5 * (y1 - y0)) / voll < 0.002, 'geschlossene Wand = Mantelfläche');
+  const loch12 = { theta: Math.PI * 2, y: 0.2, r: 0.15 }; // Auslauf 12 Uhr, DN 300
+  const loch6 = { theta: Math.PI, y: 0.2, r: 0.15 };      // 6 Uhr: genau an der Schnittkante
+  const w = wandMitOeffnungen({ R, theta0: Math.PI, theta1: Math.PI * 2.5, y0, y1, oeffnungen: [loch12, loch6] });
+  const d = dreiecke(w.pos);
+  const rest = d.reduce((a, x) => a + x.flaeche, 0);
+  const lochFl = Math.PI * 0.15 * 0.15; // auf dem Zylinder etwas größer als die Kreisfläche
+  const fehlt = voll - rest;
+  assert.ok(fehlt > lochFl * 1.4 && fehlt < lochFl * 1.7, `ausgespart ${fehlt.toFixed(4)} m² (1,5 Löcher ≈ ${(1.5 * lochFl).toFixed(4)})`);
+  // kein Dreieck liegt in der Öffnung bei 12 Uhr (Richtung -z, Höhe 0,2)
+  const imLoch = d.filter(({ mitte: [x, y, z] }) => z < 0 && Math.hypot(x, y - 0.2) < 0.14);
+  assert.equal(imLoch.length, 0);
+  // Normalen zeigen zur Mitte
+  assert.ok(w.nor[0] * w.pos[0] + w.nor[2] * w.pos[2] < 0);
 });

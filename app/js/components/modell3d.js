@@ -218,6 +218,85 @@ export function bermeUmrisse({ rInnen, kanaele, schritte = 120 }) {
   }
 }
 
+// ---------------------------------------------------------------- Wand mit Rohröffnungen
+
+/** Polygon an der Halbebene nx·x + ny·y ≤ c (bzw. ≥ c) abschneiden (Sutherland-Hodgman). */
+function halbebene(poly, nx, ny, c, aussen) {
+  const f = ([x, y]) => (aussen ? -1 : 1) * (nx * x + ny * y - c);
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    const fp = f(p), fq = f(q);
+    if (fp <= 0) out.push(p);
+    if ((fp < 0 && fq > 0) || (fp > 0 && fq < 0)) {
+      const t = fp / (fp - fq);
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  return out;
+}
+const polyFlaeche = (p) => Math.abs(p.reduce((a, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return a + x * y2 - x2 * y; }, 0) / 2);
+
+/** Konvexes Polygon minus konvexes Loch = disjunkte konvexe Teile (je Lochkante: außerhalb dieser, innerhalb der vorigen). */
+function ohneLoch(poly, loch) {
+  const teile = [];
+  let rest = poly;
+  for (let k = 0; k < loch.length && rest.length >= 3; k++) {
+    const [ax, ay] = loch[k], [bx, by] = loch[(k + 1) % loch.length];
+    const nx = by - ay, ny = -(bx - ax); // nach außen (Loch gegen den Uhrzeigersinn)
+    const c = nx * ax + ny * ay;
+    const aussen = halbebene(rest, nx, ny, c, true);
+    if (aussen.length >= 3 && polyFlaeche(aussen) > 1e-10) teile.push(aussen);
+    rest = halbebene(rest, nx, ny, c, false);
+  }
+  return teile;
+}
+
+/**
+ * Zylindrische Wandfläche (Radius R, Winkel θ0…θ1 in Uhr-Richtung: x = R·sin θ, z = −R·cos θ, Höhe
+ * y0…y1) mit Öffnungen für radial einmündende Rohre ({theta, y (Mitte), r}). Die Fläche wird als
+ * Raster gebaut (Spalten ≤ 3°, sonst eben gerade); nur Zellen am Rohr werden exakt um die Öffnung
+ * herum zerlegt. Liefert {pos, nor} (Dreiecke, x/y/z flach) – ohne three.js, testbar.
+ */
+export function wandMitOeffnungen({ R, theta0, theta1, y0, y1, oeffnungen = [] }) {
+  const N = 32;
+  const loecher = oeffnungen.filter((o) => o.r > 0.005).map((o) => {
+    const r = Math.min(o.r, R * 0.95);
+    const poly = Array.from({ length: N }, (_, j) => {
+      const ph = (2 * Math.PI * j) / N;
+      return [R * (o.theta + Math.asin(Math.min(0.999, (r * Math.cos(ph)) / R))), o.y + r * Math.sin(ph)];
+    });
+    const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+    return { poly, s0: Math.min(...xs), s1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  });
+  const pos = [], nor = [];
+  const punkt = ([sv, y]) => {
+    const t = sv / R;
+    pos.push(R * Math.sin(t), y, -R * Math.cos(t));
+    nor.push(-Math.sin(t), 0, Math.cos(t)); // Vorderseite der Dreiecke zeigt zur Schachtmitte
+  };
+  const dreieck = (a, b, c) => { punkt(a); punkt(b); punkt(c); };
+  const spalten = Math.max(1, Math.ceil((theta1 - theta0) / (Math.PI / 60)));
+  const zeilenH = 0.04;
+  const zeilen = Math.max(1, Math.ceil((y1 - y0) / zeilenH));
+  for (let i = 0; i < spalten; i++) {
+    const sa = R * (theta0 + ((theta1 - theta0) * i) / spalten);
+    const sb = R * (theta0 + ((theta1 - theta0) * (i + 1)) / spalten);
+    const betroffen = loecher.filter((l) => l.s1 > sa && l.s0 < sb && l.y1 > y0 && l.y0 < y1);
+    if (!betroffen.length) { dreieck([sa, y0], [sb, y0], [sb, y1]); dreieck([sa, y0], [sb, y1], [sa, y1]); continue; }
+    for (let j = 0; j < zeilen; j++) {
+      const ya = y0 + ((y1 - y0) * j) / zeilen, yb = y0 + ((y1 - y0) * (j + 1)) / zeilen;
+      let teile = [[[sa, ya], [sb, ya], [sb, yb], [sa, yb]]];
+      for (const l of betroffen) {
+        if (l.y1 <= ya || l.y0 >= yb) continue;
+        teile = teile.flatMap((t) => ohneLoch(t, l.poly));
+      }
+      for (const t of teile) for (let k = 1; k < t.length - 1; k++) dreieck(t[0], t[k], t[k + 1]);
+    }
+  }
+  return { pos, nor };
+}
+
 /**
  * Nebengerinne für alle weiteren Zuläufe, deren Sohle nicht über der Berme liegt (sonst fällt das Wasser
  * auf die Berme): Breite nach DN (höchstens wie das Hauptgerinne), Sohle fällt vom Zulauf zur Mündung.
@@ -283,18 +362,43 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
   };
   const ring = (ri, y0, y1, color, t = wand) => lathe([[ri, y0], [ri + t, y0], [ri + t, y1], [ri, y1], [ri, y0]], color);
 
+  // Öffnungen für die Rohre: Wand von 6 über 9 und 12 bis 3 Uhr (offenes Viertel 3–6 Uhr)
+  const THETA0 = Math.PI, THETA1 = Math.PI * 2.5;
+  const rohrRadius = (c) => Math.min(0.8, Math.max(0.1, (Number(c.dn) || 150) / 1000)) / 2;
+  const oeffnungen = (inspection?.connections || []).filter((c) => c.clock).map((c) => {
+    let theta = ((Number(c.clock) % 12) * Math.PI) / 6;
+    if (theta < THETA0 - 1e-9) theta += Math.PI * 2;
+    const r = rohrRadius(c);
+    return { theta, y: anschlussHoehe(c, T) + r, r };
+  });
+  // runde Wand (innen und außen mit Öffnungen) samt Ober- und Unterkante
+  const wandRund = (R, y0, y1, color) => {
+    for (const rad of [R, R + wand]) {
+      const { pos, nor } = wandMitOeffnungen({ R: rad, theta0: THETA0, theta1: THETA1, y0, y1, oeffnungen });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.add(new THREE.Mesh(geo, mat(color)));
+    }
+    lathe([[R, y1], [R + wand, y1]], color);
+    lathe([[R, y0], [R + wand, y0]], color);
+  };
+
   // Unterteil mit Bodenplatte
   const rU = M.unterteil.l / 2;
   if (M.unterteilDa) {
     if (M.unterteil.eckig) kasten(M.unterteil.l, M.unterteil.w, -0.15, M.hUnterteil, FARBEN.unterteil);
-    else lathe([[0, -0.15], [rU + wand, -0.15], [rU + wand, M.hUnterteil], [rU, M.hUnterteil], [rU, 0], [0, 0]], FARBEN.unterteil);
+    else {
+      lathe([[0, -0.15], [rU + wand, -0.15], [rU + wand, 0], [rU, 0], [0, 0]], FARBEN.unterteil);
+      wandRund(rU, 0, M.hUnterteil, FARBEN.unterteil);
+    }
   }
   // untere Schachtzone (Sonderschacht)
   let rOben = M.dn / 2;
   if (M.unten) {
     const rZ = M.unten.l / 2;
     if (M.unten.eckig) kasten(M.unten.l, M.unten.l, M.z.unten, M.z.aufbau, FARBEN.unten);
-    else ring(rZ, M.z.unten, M.z.aufbau, FARBEN.unten);
+    else wandRund(rZ, M.z.unten, M.z.aufbau, FARBEN.unten);
     if (M.unten.uebergangsplatte && rZ > rOben) lathe([[rOben, M.z.aufbau - 0.15], [rZ + wand, M.z.aufbau - 0.15], [rZ + wand, M.z.aufbau], [rOben, M.z.aufbau], [rOben, M.z.aufbau - 0.15]], FARBEN.konus);
     if (M.unten.podest) {
       const y = M.z.unten + (M.z.aufbau - M.z.unten) * 0.5;
@@ -306,7 +410,7 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
   // Schachtaufbau: Ringe, Konus bzw. Abdeckplatte
   const rD = M.dDeckel / 2;
   if (M.aufbau.eckig) kasten(M.aufbau.l, M.aufbau.w, M.z.aufbau, M.z.konus, FARBEN.aufbau);
-  else ring(rOben, M.z.aufbau, M.z.konus, FARBEN.aufbau);
+  else wandRund(rOben, M.z.aufbau, M.z.konus, FARBEN.aufbau);
   // Ringfugen andeuten
   for (let y = M.z.aufbau + 0.5; y < M.z.konus - 0.1; y += 0.5) {
     if (M.aufbau.eckig) break;
@@ -402,7 +506,7 @@ export function baueSchacht(THREE, { bauteile, inspection }) {
     const len = 0.7;
     const color = c.dir === 'out' ? FARBEN.aus : c.dir === 'closed' ? FARBEN.zu_ : FARBEN.zu;
     const pipe = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 32, 1, true), mat(color));
-    const start = wallAt(y) - 0.02;
+    const start = wallAt(y) - 0.004; // bündig mit der Innenseite (Öffnung in der Wand)
     pipe.position.copy(d.clone().multiplyScalar(start + len / 2)).setY(y);
     pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
     g.add(pipe);
