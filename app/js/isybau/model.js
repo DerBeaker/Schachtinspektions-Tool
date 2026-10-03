@@ -103,8 +103,9 @@ function pos(from, to) {
  */
 export function buildRecords(insp, { photoName = () => null, version = '2017-07' } = {}) {
   const T = insp.tiefe != null && insp.tiefe !== '' ? Number(insp.tiefe) : null;
+  // „von unten“ (1): Sohle = 0,00, Deckel = Tiefe; „von oben“ (2): Deckel = 0,00, Sohle = Tiefe.
+  // Die Inspektion beginnt immer am Bezugspunkt (0,00) und endet am gegenüberliegenden Ende.
   const top = insp.bezugVertikal === '2' ? 0 : T;
-  const bottom = insp.bezugVertikal === '2' ? T : 0;
   const entries = [];
   let seq = 0;
   const add = (vert, rec, prio = 5) => entries.push({ vert, prio, seq: seq++, rec });
@@ -188,9 +189,9 @@ export function buildRecords(insp, { photoName = () => null, version = '2017-07'
   groups.sort((a, b) => a.vert - b.vert || a.prio - b.prio || a.seq - b.seq);
 
   const ordered = [];
-  ordered.push({ vert: bottom ?? 0, rec: { InspektionsKode: 'DDB', Streckenschaden: 'A', _erfassung: '1' } });
+  ordered.push({ vert: 0, rec: { InspektionsKode: 'DDB', Streckenschaden: 'A', _erfassung: '1' } });
   for (const g of groups) for (const e of g.items) ordered.push({ vert: e.vert, rec: e.rec });
-  const endVert = Math.max(top ?? 0, bottom ?? 0, ...ordered.map((o) => o.vert));
+  const endVert = Math.max(T ?? 0, ...ordered.map((o) => o.vert));
   ordered.push({
     vert: endVert,
     rec: { InspektionsKode: 'DDB', Streckenschaden: 'B', Kommentar: insp.schlussbemerkung || null, _erfassung: '1' },

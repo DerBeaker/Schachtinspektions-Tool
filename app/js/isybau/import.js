@@ -58,6 +58,24 @@ function directionAt(P, line, otherPos) {
  * edges: [{name, von, nach, sohleVon, sohleNach, hoehe, breite, line:[{x,y}], …}]
  */
 export function assembleManholes(nodes, edges, warnings = []) {
+  // Datei ohne Schachtobjekte (nur Haltungen): Schächte aus den Haltungsenden ableiten.
+  // Lage aus dem Anfangs-/Endpunkt der Haltungsgeometrie, Sohlhöhen aus den Haltungen, Tiefe unbekannt.
+  let abgeleitet = 0;
+  if (![...nodes.values()].some((n) => n.knotenTyp === '0')) {
+    for (const e of edges) {
+      for (const [name, typ, p] of [[e.von, e.vonTyp, e.line?.[0]], [e.nach, e.nachTyp, e.line?.[e.line.length - 1]]]) {
+        if (!name || nodes.has(name) || (typ && typ !== '0')) continue; // nur Schächte (Knotentyp 0)
+        nodes.set(name, {
+          name, knotenTyp: '0', status: '', baujahr: '', entwaesserungsart: e.entwaesserungsart || '', kommentar: '',
+          strasse: e.strasse || '', strassenschluessel: e.strassenschluessel || '',
+          ortsteil: e.ortsteil || '', ortsteilschluessel: e.ortsteilschluessel || '',
+          x: p?.x ?? null, y: p?.y ?? null, pos: p?.x != null ? p : null,
+          deckelhoehe: null, sohlhoehe: null, crs: e.crs || '', schacht: null, deckel: null, abgeleitet: true,
+        });
+        abgeleitet++;
+      }
+    }
+  }
   const byNode = new Map();
   for (const e of edges) {
     for (const k of new Set([e.von, e.nach])) {
@@ -136,6 +154,7 @@ export function assembleManholes(nodes, edges, warnings = []) {
       crs: n.crs,
       deckelhoehe: r3(deckelhoehe),
       deckelhoeheBerechnet: n.deckelhoehe == null && deckelhoehe != null,
+      abgeleitet: !!n.abgeleitet,
       sohlhoehe: r3(refSohle),
       tiefe,
       schacht: n.schacht,
@@ -147,7 +166,8 @@ export function assembleManholes(nodes, edges, warnings = []) {
   manholes.sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
 
   if (!manholes.length) warnings.push('Es wurden keine Schächte gefunden.');
-  const ohneTiefe = manholes.filter((m) => m.tiefe == null).length;
+  if (abgeleitet) warnings.push(`Die Datei enthält keine Schachtdaten: ${abgeleitet} Schächte wurden aus den Haltungsenden abgeleitet (ohne Deckelhöhe/Tiefe – bitte vor Ort messen).`);
+  const ohneTiefe = manholes.filter((m) => m.tiefe == null && !m.abgeleitet).length;
   if (ohneTiefe) warnings.push(`${ohneTiefe} Schächte ohne Tiefenangabe.`);
   if (ohneAblauf) warnings.push(`${ohneAblauf} Schächte ohne Ablauf in den Stammdaten – dort bitte den Auslauf (12 Uhr) am Foto festlegen.`);
   if (deckelBerechnet) warnings.push(`Deckelhöhe bei ${deckelBerechnet} Schächten aus Sohlhöhe + Schachttiefe berechnet.`);
@@ -157,7 +177,7 @@ export function assembleManholes(nodes, edges, warnings = []) {
 function importM150(root) {
   const d = parseM150(root);
   const warnings = [];
-  if (!d.nodes.size) throw new Error('Die DWA-M-150-Datei enthält keine Knoten (KG).');
+  if (!d.nodes.size && !d.edges.length) throw new Error('Die DWA-M-150-Datei enthält weder Knoten (KG) noch Haltungen (HG).');
   const manholes = assembleManholes(d.nodes, d.edges, warnings);
   return {
     format: 'm150',
@@ -260,6 +280,14 @@ export function importStammdaten(input) {
         kantenTyp: text(k, 'KantenTyp'),
         von: text(k, 'KnotenZulauf'),
         nach: text(k, 'KnotenAblauf'),
+        vonTyp: text(k, 'KnotenZulaufTyp'),
+        nachTyp: text(k, 'KnotenAblaufTyp'),
+        entwaesserungsart: text(a, 'Entwaesserungsart'),
+        strasse: text(a, 'Lage/Strassenname'),
+        strassenschluessel: text(a, 'Lage/Strassenschluessel'),
+        ortsteil: text(a, 'Lage/Ortsteilname'),
+        ortsteilschluessel: text(a, 'Lage/Ortsteilschluessel'),
+        crs: geo ? text(geo, 'CRSLage') : '',
         sohleVon: num(k, 'SohlhoeheZulauf'),
         sohleNach: num(k, 'SohlhoeheAblauf'),
         material: text(k, 'Material'),

@@ -53,9 +53,9 @@ function sample(kodiersystem = '9') {
   return { project, items };
 }
 
-test('DWA-M 150: Export Typ B (KG/KI/KZ, Dezimalkomma, Referenztabellen)', () => {
+test('DWA-M 150: Export Typ B, Variante DWA-Beispiel (Buchstaben, Dezimalkomma)', () => {
   const { project, items } = sample();
-  const out = exportM150({ project, items, settings: { company: 'Kanalservice Müller GmbH' } });
+  const out = exportM150({ project, items, settings: { company: 'Kanalservice Müller GmbH' }, variante: 'dwa' });
   const s = Buffer.from(out.bytes).toString('latin1');
   assert.ok(s.startsWith('<?xml version="1.0" encoding="ISO-8859-1"'));
   assert.ok(s.includes('Müller')); // Latin-1
@@ -95,6 +95,45 @@ test('DWA-M 150: Export Typ B (KG/KI/KZ, Dezimalkomma, Referenztabellen)', () =>
   const again = importStammdaten(out.bytes);
   assert.deepEqual(again.manholes.map((m) => m.name), ['S11', 'S12']);
   assert.equal(again.manholes[0].tiefe, 2.1);
+});
+
+test('DWA-M 150: Standardvariante mit ISYBAU-Schlüsseln, Dezimalpunkt und ISO-Datum', () => {
+  const { project, items } = sample();
+  items[0].inspection.wasserhaltung = '2';
+  items[0].inspection.reinigung = true;
+  const out = exportM150({ project, items });
+  const doc = parseXml(decodeXmlBytes(out.bytes));
+  const kg = children(doc, 'KG')[0];
+  assert.equal(text(kg, 'KG211'), '2.10');
+  assert.equal(text(kg, 'GO/GP/GP003'), '3456140.000');
+  const ki = child(kg, 'KI');
+  assert.equal(text(ki, 'KI004'), '1'); // Ersterfassung (ISYBAU U101)
+  assert.equal(text(ki, 'KI101'), '1'); // Sohle tiefster Auslauf
+  assert.equal(text(ki, 'KI103'), '2'); // vom Schacht aus
+  assert.equal(text(ki, 'KI104'), '2026-05-12');
+  assert.equal(text(ki, 'KI107'), '1');
+  assert.equal(text(ki, 'KI109'), '2');
+  const dab = children(ki, 'KZ').find((z) => text(z, 'KZ002') === 'DAB');
+  assert.equal(text(dab, 'KZ003'), '0.8');
+  assert.match(text(dab, 'KZ001'), /^\d+\.\d{2}$/);
+  const rt = children(doc, 'RT').map((r) => `${text(r, 'RT001')}:${text(r, 'RT002')}=${text(r, 'RT004')}`);
+  assert.ok(rt.includes('201:1=Ersterfassung'));
+  assert.ok(rt.includes('206:2=Zufluss von oberhalb abgesperrt'));
+  assert.ok(rt.some((x) => x.startsWith('210:1=Sohle')));
+});
+
+test('DWA-M 150: Import einer reinen Haltungsdatei (ohne KG) leitet Schächte ab', () => {
+  const xml = `<?xml version="1.0" encoding="ISO-8859-1"?><DATA><FD><FD001>04-2010</FD001><FD002>B</FD002></FD>
+    <HG><HG001>H1</HG001><HG003>A1</HG003><HG004>A2</HG004><HG102>Teststraße</HG102><HG304>STZ</HG304><HG305>0</HG305><HG306>300</HG306><HG307/><HG310>12.5</HG310><HG313>A</HG313>
+      <HI><HI104>2026-06-22</HI104><HZ><HZ001>0.0</HZ001><HZ002>BCD</HZ002></HZ></HI></HG>
+    <HG><HG001>H2</HG001><HG003>A2</HG003><HG004>A3</HG004><HG306>400</HG306><HG313>A</HG313></HG></DATA>`;
+  const r = importStammdaten(xml);
+  assert.deepEqual(r.manholes.map((m) => m.name), ['A1', 'A2', 'A3']);
+  const a2 = r.manholes[1];
+  assert.equal(a2.strasse, 'Teststraße');
+  assert.deepEqual(a2.pipes.map((p) => [p.name, p.dir, p.dnHoehe]).sort(), [['H1', 'in', 300], ['H2', 'out', 400]]);
+  assert.equal(a2.tiefe, null);
+  assert.ok(r.warnings.some((w) => /aus den Haltungsenden abgeleitet/.test(w)));
 });
 
 test('DWA-M 150: BFR-Kodierung wird als EN 13508 gekennzeichnet', () => {

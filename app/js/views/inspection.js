@@ -10,7 +10,7 @@ import { CODES, GROUPS, codeLabel, fullCode, FAVORITES, quantDef } from '../data
 import { REF, refLabel } from '../data/reflists.js';
 import { photoView } from '../components/photoview.js';
 import { shaftOverview } from '../components/shaft.js';
-import { openFindingEditor, openConnectionEditor } from './editors.js';
+import { openFindingEditor, openConnectionEditor, defaultLageMode } from './editors.js';
 import { validateInspection } from '../isybau/validate.js';
 import { bothDepths, connectionsFromStamm } from '../isybau/model.js';
 import { pickPhoto, processPhoto } from '../lib/image.js';
@@ -192,7 +192,7 @@ export async function renderInspection(view, manholeId, params) {
             h('div', { class: 'muted small' }, c.clock ? `bisher ${c.clock} Uhr${c.clockFromStamm ? ' (aus Stammdaten berechnet)' : ''}` : 'noch keine Lage')))),
         h('button', { class: 'menu-item', onclick: () => {
           s.close();
-          openConnectionEditor({ insp, conn: { id: uid(), dir: 'in', clock: hour, clockSet: true, dn: '', dnB: '', form: 'A', dca: 'B', dcaC2: '', bereich: 'J', lageMode: 'oben', lageValue: '', kommentar: '' },
+          openConnectionEditor({ insp, conn: { id: uid(), dir: 'in', clock: hour, clockSet: true, dn: '', dnB: '', form: 'A', dca: 'B', dcaC2: '', bereich: 'J', lageMode: defaultLageMode(), lageValue: '', kommentar: '' },
             onSave: (c) => { insp.connections.push(c); changed(); } });
         } }, icon('plus'), h('div', null, h('div', 'Neuer Anschluss'), h('div', { class: 'muted small' }, 'nicht in den Stammdaten'))),
         insp.connections.filter((c) => c.clockSet).length ? h('div', { class: 'section-title' }, 'Bereits zugeordnet') : null,
@@ -395,8 +395,13 @@ export async function renderInspection(view, manholeId, params) {
             numInput(insp.tiefe, (val) => { insp.tiefe = val === '' ? null : Number(val); insp.tiefeQuelle = 'gemessen'; changed(false); }, { unit: 'm' }), h('span', { class: 'unit' }, 'm')),
           insp.tiefeQuelle === 'stamm' ? `aus Stammdaten${manhole.tiefe != null ? ' (' + fmtM(manhole.tiefe) + ')' : ''} – bei Abweichung gemessenen Wert eintragen`
             : insp.tiefeQuelle === 'foto' ? 'aus Foto geschätzt – bitte nachmessen' : insp.tiefeQuelle === 'gemessen' ? 'gemessen' : null),
-          field('Vertikaler Bezugspunkt', select(insp.bezugVertikal, REF.U115, (val) => { insp.bezugVertikal = val; changed(); }),
-            'Standard nach BFR Abwasser: Sohle der tiefsten abgehenden Leitung = 0,00 m. Eingaben „ab Deckel“ werden automatisch umgerechnet.'),
+          field('Höhenangaben im Export', segmented(insp.bezugVertikal || '1', [['1', 'von unten ↑'], ['2', 'von oben ↓']], (val) => { insp.bezugVertikal = val; changed(); }),
+            (() => {
+              const t = insp.tiefe != null && insp.tiefe !== '' ? `${fmtNum(insp.tiefe)} m` : 'Schachttiefe';
+              return insp.bezugVertikal === '2'
+                ? `Anfang am Deckel = 0,00 m, Ende an der Sohle = ${t}. Eingaben „ab Deckel“ oder „über Sohle“ werden umgerechnet.`
+                : `Anfang an der Sohle (tiefster Auslauf) = 0,00 m, Ende am Deckel = ${t}. Eingaben „ab Deckel“ oder „über Sohle“ werden umgerechnet.`;
+            })()),
           h('p', { class: 'muted small row' }, icon('info', 16), h('span', 'Laser mit Bluetooth-Tastaturmodus: Feld antippen, am Gerät messen – der Wert wird eingetragen (auch „2345 mm“ oder „2,345 m“), Enter springt weiter.')),
           h('div', { class: 'grid2' },
             field('Innenschutz', select(insp.innenschutz, [['', '–'], ...REF.G103], set('innenschutz'))),

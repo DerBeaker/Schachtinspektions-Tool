@@ -12,8 +12,12 @@ import { addPhoto, photoUrl, deletePhoto } from '../core/store.js';
 import { pickPhoto, processPhoto } from '../lib/image.js';
 
 // ---- Vertikale Lage --------------------------------------------------------
+// Messrichtung der Eingabe (ab Deckel / über Sohle): die zuletzt gewählte wird pro Gerät gemerkt.
+let lastLageMode = (() => { try { return localStorage.getItem('sb.lageMode') || 'oben'; } catch { return 'oben'; } })();
+export const defaultLageMode = () => lastLageMode;
+
 export function lageInput(insp, mode, value, onChange, { label = 'Vertikale Lage' } = {}) {
-  let m = mode || 'oben';
+  let m = mode || lastLageMode;
   let v = value ?? '';
   const out = h('div', { class: 'field-hint' });
   const upd = () => {
@@ -25,7 +29,11 @@ export function lageInput(insp, mode, value, onChange, { label = 'Vertikale Lage
   upd();
   return h('div', { class: 'field' },
     h('span', { class: 'field-label' }, label),
-    segmented(m, [['oben', 'ab OK Deckel ↓'], ['unten', 'über Sohle ↑']], (nm) => { m = nm; upd(); onChange(m, v); }, { small: true }),
+    segmented(m, [['oben', 'ab OK Deckel ↓'], ['unten', 'über Sohle ↑']], (nm) => {
+      m = nm; lastLageMode = nm;
+      try { localStorage.setItem('sb.lageMode', nm); } catch { /* privater Modus */ }
+      upd(); onChange(m, v);
+    }, { small: true }),
     h('div', { class: 'input-unit' }, inp, h('span', { class: 'unit' }, 'm')),
     out);
 }
@@ -76,7 +84,7 @@ export function openFindingEditor({ insp, project, finding, onSave, onDelete, pr
   const start = (code) => {
     f = f || {
       id: uid(), code, c1: '', c2: '', q1: '', q2: '', clockFrom: null, clockTo: null,
-      bereich: CODES[code].defaultBereich || '', lageMode: 'oben', lageValue: CODES[code].atTop ? 0 : '',
+      bereich: CODES[code].defaultBereich || '', lageMode: CODES[code].atTop ? 'oben' : lastLageMode, lageValue: CODES[code].atTop ? 0 : '',
       strecke: false, lageEndValue: '', verbindung: false, kommentar: '', photoId: null, source: 'manual',
     };
     if (f.code !== code) Object.assign(f, { code, c1: '', c2: '', q1: '', q2: '' });
@@ -207,7 +215,7 @@ export function openConnectionEditor({ insp, conn, onSave, onDelete }) {
   const isNew = !conn;
   const c = conn ? structuredClone(conn) : {
     id: uid(), dir: 'in', clock: null, dn: '', dnB: '', form: 'A', dca: 'B', dcaC2: '', bereich: 'J',
-    lageMode: 'unten', lageValue: '', kommentar: '', isReference: false,
+    lageMode: lastLageMode, lageValue: '', kommentar: '', isReference: false,
   };
   const issues = h('div');
   const dcaC2Box = h('div');

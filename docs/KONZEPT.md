@@ -48,7 +48,7 @@ Grenze einer Web-App: Spezialsensoren wie der LiDAR-Scanner im iPhone Pro sind a
 
 - **Kodiersystem**: DIN EN 13508-2:2011. Die Hauptkodes für Schächte (DAA … DDG, DCA/DCG usw.) sind bei ISYBAU (BFR Abwasser) und DWA-M 149-2 gleich; ISYBAU erlaubt weniger Charakterisierungen und hat strengere Regeln. Der Katalog in der App entspricht der aktuellen BFR-Abwasser-Liste „Zulässige Kodes für Schächte“ (Stand 01/2025). Pro Projekt wählbar: ISYBAU (Kodiersystem 10) oder DWA-M 149-2 (Kodiersystem 9).
 - **Lage am Umfang**: Draufsicht, tiefster Auslauf = 12 Uhr (BFR A-2.3.5). Genau das bildet das Zifferblatt über dem Foto ab.
-- **Vertikale Lage**: Standard-Bezugspunkt ist die Sohle der tiefsten abgehenden Leitung (0,00 m). Eingaben „ab OK Deckel“ werden über die Schachttiefe umgerechnet; alternativ kann der Auftraggeber „OK Abdeckung“ als Bezug festlegen.
+- **Vertikale Lage**: Pro Projekt umschaltbar. **Von unten** (Standard, ISYBAU-Bezugspunkt 1): Inspektionsanfang an der Sohle der tiefsten abgehenden Leitung = 0,00 m, Inspektionsende am Deckel = Schachttiefe (z. B. 2,34 m). **Von oben** (Bezugspunkt 2): Deckel = 0,00 m, Sohle = Schachttiefe. Die Werte werden so gespeichert, wie sie gemessen wurden („ab OK Deckel“ oder „über Sohle“), und erst beim Export umgerechnet – die Richtung kann deshalb auch nach der Aufnahme noch geändert werden.
 - **Import**: ISYBAU-Stammdaten (XML 2006/2013/2017/2024) und DWA-M 150 (Dezimalkomma oder -punkt, Gauß-Krüger oder UTM). Aus Deckel- und Sohlhöhen sowie der Leitungsgeometrie werden Schachttiefe, Anschlusshöhen und die Lage der Anschlüsse am Umfang **vorberechnet**. Test mit den offiziellen ISYBAU-Beispieldaten: 100 von 113 Schächten exakt, Rest ±1 Stunde. Fehlt die Deckelhöhe (häufig in älteren Bestandsdaten), wird sie aus Sohlhöhe + Schachttiefe berechnet; Schächte ohne Ablauf in den Stammdaten (Endschacht, Projektgrenze) werden gemeldet – dort legt der Inspekteur den Auslauf am Foto fest.
 - **Export**: Abgabeformat pro Projekt wählbar – genau das, was der jeweilige Auftraggeber verlangt:
 
@@ -58,7 +58,7 @@ Grenze einer Web-App: Spezialsensoren wie der LiDAR-Scanner im iPhone Pro sind a
   | ISYBAU XML-2013 | alter Namensraum, Liegenschaft Pflicht, Kodiersystem 9 (DWA) oder 10 (BFR) |
   | ISYBAU XML-2017 | Namensraum bfr-abwasser.de, Datensatz-Index, Drainage-Kennzeichen |
   | ISYBAU XML-2024 | zusätzlich Erfassungsart (KI-Vorschläge = „Assistenzsystem“) |
-  | DWA-M 150 Typ B | je Schacht KG (Stammdaten) + KI (Inspektion) + KZ (Zustände), Referenztabellen, Dezimalkomma, Datum TT.MM.JJJJ |
+  | DWA-M 150 Typ B | je Schacht KG (Stammdaten) + KI (Inspektion) + KZ (Zustände) + Referenztabellen. Zwei Schlüsselvarianten: ISYBAU-Werte mit Dezimalpunkt und Datum JJJJ-MM-TT (so schreiben es gängige Kanalinspektionsprogramme, Standard) oder Buchstabenschlüssel mit Dezimalkomma wie die DWA-Beispieldatei. Die verwendeten Schlüssel stehen in jedem Fall in den RT-Tabellen der Datei. |
 
   Automatisch erzeugt werden Inspektionsanfang/-ende (DDB A/B), Anschlüsse als DCA+DCG-Paare, Streckenfeststellungen (A/B mit laufender Nummer), Übersichtsfoto als DDA, Fotodateinamen nach Konvention. Jeder ISYBAU-Export ist in den automatischen Tests **gegen das offizielle XSD-Schema seiner Version validiert** (BFR- und DWA-Kodierung). Für DWA-M 150 gibt es kein öffentliches XSD; Aufbau und Schlüssel folgen der offiziellen DWA-Beispieldatei.
 - Empfehlung vor dem ersten echten Projekt: einen Export mit der Prüfsoftware des Auftraggebers (z. B. PIETS) gegenprüfen lassen.

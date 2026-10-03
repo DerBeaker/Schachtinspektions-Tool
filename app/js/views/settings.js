@@ -5,7 +5,7 @@ import { navigate, topbar } from '../core/shell.js';
 import { getSettings, saveSettings, storageInfo } from '../core/store.js';
 import { sync } from '../sync.js';
 import { db } from '../core/db.js';
-import { REF } from '../data/reflists.js';
+import { BEZUG_VERTIKAL } from '../data/reflists.js';
 import { APP_NAME, APP_VERSION } from '../isybau/export.js';
 
 export async function renderSettings(view) {
@@ -103,7 +103,7 @@ export async function renderSettings(view) {
         h('h3', 'Inspekteur & Firma'),
         field('Name des Inspekteurs', input(s.inspector, set('inspector'), { autocomplete: 'name', placeholder: 'Vor- und Nachname' }), 'Wird in jede neue Inspektion übernommen (ISYBAU „NameUntersucher“).'),
         field('Firma (Auftragnehmer)', input(s.company, set('company'), { autocomplete: 'organization' })),
-        field('Standard-Bezugspunkt vertikal', select(s.bezugVertikal, REF.U115, set('bezugVertikal')))),
+        field('Höhenangaben für neue Projekte', select(s.bezugVertikal || '1', BEZUG_VERTIKAL, set('bezugVertikal')), 'Pro Projekt unter „Projekt & Auftrag“ änderbar.')),
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Darstellung'),
         field('Farbschema', select(s.theme || '', [['', 'automatisch (System)'], ['light', 'hell – besser bei Sonne'], ['dark', 'dunkel']], (v) => {

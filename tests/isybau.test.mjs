@@ -106,6 +106,52 @@ test('Datensätze: DDB A zuerst, DDB B zuletzt, DCG direkt nach DCA, Strecke A/B
   assert.deepEqual(st.map((r) => [r.Streckenschaden, r.StreckenschadenLfdNr]), [['A', '1'], ['B', '1']]);
 });
 
+test('Höhenangaben von oben: Anfang am Deckel = 0,00, Ende an der Sohle = Tiefe', () => {
+  const { items } = sampleProject();
+  const insp = items[0].inspection;
+  insp.bezugVertikal = '2';
+  const recs = buildRecords(insp, { photoName: (x) => x + '.jpg' });
+  assert.equal(recs[0].InspektionsKode, 'DDB');
+  assert.equal(recs[0].Streckenschaden, 'A');
+  assert.equal(recs[0].VertikaleLage, '0.00');
+  assert.equal(recs.at(-1).InspektionsKode, 'DDB');
+  assert.equal(recs.at(-1).VertikaleLage, Number(insp.tiefe).toFixed(2));
+  const verts = recs.map((r) => Number(r.VertikaleLage));
+  assert.deepEqual(verts, [...verts].sort((a, b) => a - b));
+  // DAB wurde „0,90 m ab Deckel“ erfasst -> von oben 0,90
+  assert.equal(recs.find((r) => r.InspektionsKode === 'DAB').VertikaleLage, '0.90');
+  // und von unten: Tiefe - 0,90
+  insp.bezugVertikal = '1';
+  const up = buildRecords(insp, { photoName: (x) => x + '.jpg' });
+  assert.equal(up[0].VertikaleLage, '0.00');
+  assert.equal(up.find((r) => r.InspektionsKode === 'DAB').VertikaleLage, (Number(insp.tiefe) - 0.9).toFixed(2));
+});
+
+test('Stammdaten nur mit Haltungen: Schächte werden aus den Haltungsenden abgeleitet', () => {
+  const xml = `<?xml version="1.0" encoding="ISO-8859-1"?>
+<Identifikation xmlns="http://www.ofd-hannover.la/Identifikation"><Version>2006-10</Version><Admindaten/><Datenkollektive><Stammdatenkollektiv><Kennung>STA01</Kennung>
+<AbwassertechnischeAnlage><Objektbezeichnung>H1</Objektbezeichnung><Objektart>1</Objektart><Kante><KantenTyp>0</KantenTyp>
+  <KnotenZulauf>S1</KnotenZulauf><KnotenZulaufTyp>0</KnotenZulaufTyp><KnotenAblauf>S2</KnotenAblauf><KnotenAblaufTyp>0</KnotenAblaufTyp>
+  <SohlhoeheZulauf>100.50</SohlhoeheZulauf><SohlhoeheAblauf>100.20</SohlhoeheAblauf><Profil><Profilhoehe>300</Profilhoehe></Profil></Kante>
+  <Lage><Strassenname>Testweg</Strassenname></Lage>
+  <Geometrie><Geometriedaten><Kanten><Kante><Start><Rechtswert>500000</Rechtswert><Hochwert>5600040</Hochwert></Start><Ende><Rechtswert>500000</Rechtswert><Hochwert>5600000</Hochwert></Ende></Kante></Kanten></Geometriedaten></Geometrie></AbwassertechnischeAnlage>
+<AbwassertechnischeAnlage><Objektbezeichnung>H2</Objektbezeichnung><Objektart>1</Objektart><Kante><KantenTyp>0</KantenTyp>
+  <KnotenZulauf>S2</KnotenZulauf><KnotenZulaufTyp>0</KnotenZulaufTyp><KnotenAblauf>S3</KnotenAblauf><KnotenAblaufTyp>0</KnotenAblaufTyp>
+  <SohlhoeheZulauf>100.10</SohlhoeheZulauf><Profil><Profilhoehe>400</Profilhoehe></Profil></Kante>
+  <Geometrie><Geometriedaten><Kanten><Kante><Start><Rechtswert>500000</Rechtswert><Hochwert>5600000</Hochwert></Start><Ende><Rechtswert>499960</Rechtswert><Hochwert>5600000</Hochwert></Ende></Kante></Kanten></Geometriedaten></Geometrie></AbwassertechnischeAnlage>
+</Stammdatenkollektiv></Datenkollektive></Identifikation>`;
+  const r = importStammdaten(xml);
+  assert.deepEqual(r.manholes.map((m) => m.name), ['S1', 'S2', 'S3']);
+  const s2 = r.manholes[1];
+  assert.equal(s2.abgeleitet, true);
+  assert.equal(s2.strasse, 'Testweg');
+  assert.equal(s2.x, 500000);
+  const zu = s2.pipes.find((p) => p.dir === 'in');
+  assert.equal(zu.clock, 3); // Zulauf von Norden, Ablauf nach Westen
+  assert.equal(zu.hoeheUeberSohle, 0.1);
+  assert.equal(s2.tiefe, null);
+});
+
 test('Export: Struktur, Fotonamen, Kodierung', () => {
   const { project, items } = sampleProject();
   const out = exportZustandsdaten({ project, items, settings: { company: 'Kanalservice Müller GmbH' }, version: '2017-07' });
@@ -135,6 +181,7 @@ for (const version of Object.keys(xsd)) {
     test(`Export ${version} (Kodiersystem ${kodiersystem}) ist gültig gegen das offizielle XSD`, { skip: !hasXmllint || !existsSync(xsd[version]) ? 'XSD nicht vorhanden (npm run xsd)' : false }, () => {
       const { project, items } = sampleProject();
       project.kodiersystem = kodiersystem;
+      if (kodiersystem === '9') items.forEach((i) => { i.inspection.bezugVertikal = '2'; }); // auch „von oben“ prüfen
       items[0].inspection.findings.push({ id: id(), code: 'DDE', c1: 'A', bereich: 'J', lageMode: 'unten', lageValue: 0.2, drainage: true });
       const out = exportZustandsdaten({ project, items, settings: { company: 'Test GmbH' }, version });
       const dir = mkdtempSync(join(tmpdir(), 'isy-'));

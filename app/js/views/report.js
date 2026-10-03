@@ -39,7 +39,7 @@ export async function renderReport(view, inspectionId) {
       h('div', { style: { textAlign: 'right' } }, h('b', settings.company || ''), h('div', project.name), h('div', `Auftrag: ${project.auftragBezeichnung || '–'}`))),
     h('section', null, h('table', null, h('tbody', null,
       h('tr', null, h('th', 'Datum'), h('td', `${fmtDate(insp.datum)} ${insp.uhrzeit || ''}`), h('th', 'Inspekteur'), h('td', insp.inspekteur || '–')),
-      h('tr', null, h('th', 'Schachttiefe'), h('td', `${fmtM(insp.tiefe)}${insp.tiefeQuelle === 'foto' ? ' (geschätzt)' : ''}`), h('th', 'Bezugspunkt'), h('td', refLabel('U115', insp.bezugVertikal))),
+      h('tr', null, h('th', 'Schachttiefe'), h('td', `${fmtM(insp.tiefe)}${insp.tiefeQuelle === 'foto' ? ' (geschätzt)' : ''}`), h('th', 'Höhenangaben'), h('td', insp.bezugVertikal === '2' ? 'von oben (Deckel = 0,00 m)' : 'von unten (Sohle = 0,00 m)')),
       h('tr', null, h('th', 'Wetter'), h('td', refLabel('U106', insp.wetter)), h('th', 'Wasserhaltung'), h('td', refLabel('U107', insp.wasserhaltung))),
       h('tr', null, h('th', 'Kodiersystem'), h('td', project.kodiersystem === '9' ? 'DIN EN 13508-2 / DWA-M 149-2' : 'DIN EN 13508-2 / ISYBAU'), h('th', 'Status'), h('td', insp.status === 'fertig' ? 'abgeschlossen' : 'in Bearbeitung'))))),
     ov ? h('section', { style: { margin: '14px 0', maxWidth: '520px' } }, h('h3', 'Draufsicht (tiefster Auslauf = 12 Uhr)'), ov.el) : null,
@@ -51,7 +51,7 @@ export async function renderReport(view, inspectionId) {
             h('td', dep != null && dep !== '' ? `${fmtNum(dep)} m` : '–'), h('td', c.pipeName || c.kommentar || ''));
         })))),
     h('section', null, h('h3', { style: { margin: '14px 0 6px' } }, 'Zustandsdaten (ISYBAU-Datensätze)'),
-      h('table', null, h('thead', null, h('tr', null, h('th', 'Nr.'), h('th', 'Lage [m]'), h('th', 'Kode'), h('th', 'Beschreibung'), h('th', 'Quant.'), h('th', 'Uhr'), h('th', 'Ber.'), h('th', 'Anmerkung / Foto'))),
+      h('table', null, h('thead', null, h('tr', null, h('th', 'Nr.'), h('th', insp.bezugVertikal === '2' ? 'Lage ab Deckel [m]' : 'Lage ab Sohle [m]'), h('th', 'Kode'), h('th', 'Beschreibung'), h('th', 'Quant.'), h('th', 'Uhr'), h('th', 'Ber.'), h('th', 'Anmerkung / Foto'))),
         h('tbody', null, recs.map((r) => h('tr', null,
           h('td', r.Index), h('td', r.VertikaleLage.replace('.', ',')),
           h('td', { class: 'mono' }, `${r.InspektionsKode}${r.Charakterisierung1 || ''}${r.Charakterisierung2 || ''}${r.Streckenschaden ? ' ' + r.Streckenschaden + (r.StreckenschadenLfdNr || '') : ''}`),

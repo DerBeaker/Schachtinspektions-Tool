@@ -1,15 +1,16 @@
 // DWA-M 150 (Datenaustauschformat für Zustandsdaten, Stand 04-2010).
 // Import: Knoten (KG) und Haltungen/Leitungen (HG) mit Geometrie (GO/GP).
 // Export: Typ B (Zustandsdaten ohne Bewertung) – je Schacht KG mit KI (Inspektion)
-// und KZ (Zustände), danach die verwendeten Referenztabellen (RT).
-// Aufbau, Feldreihenfolge und Schlüssel folgen dem offiziellen Beispiel
-// „DWA M 150 Beispiel 04_2010 Typ B“; Dezimalkomma, Datum TT.MM.JJJJ, ISO-8859-1.
+// und KZ (Zustände), danach die verwendeten Referenztabellen (RT), ISO-8859-1.
+// Aufbau und Feldreihenfolge folgen dem Beispiel „DWA M 150 Beispiel 04_2010 Typ B“;
+// Schlüssel/Zahlen-/Datumsformat je nach Variante (siehe M150_VARIANTEN).
 
 import { child, children, text, XmlWriter, encodeLatin1 } from './xml.js';
 import { buildRecords } from './model.js';
 import { photoNamer, APP_NAME, APP_VERSION } from './export.js';
 import { CODES } from '../data/codes.js';
 import { detectCrs } from '../lib/geo.js';
+import { REF } from '../data/reflists.js';
 
 // ---- Import -----------------------------------------------------------------
 
@@ -154,6 +155,12 @@ export function parseM150(root) {
       kantenTyp: haltungsart === 'B' ? '1' : '0',
       von,
       nach,
+      entwaesserungsart: NUTZUNG_TO_ISY[text(hg, 'HG302')] || '',
+      strasse: text(hg, 'HG102').trim(),
+      strassenschluessel: text(hg, 'HG101').trim(),
+      ortsteil: text(hg, 'HG104').trim(),
+      ortsteilschluessel: text(hg, 'HG103').trim(),
+      crs: pts[0]?.crs || '',
       sohleVon: zOben,
       sohleNach: zUnten,
       material: text(hg, 'HG304'),
@@ -214,38 +221,101 @@ const RT_OF = {
   KG307: '118', KG310: '118', KG311: '105', KG312: '119', KG316: '118', KG317: '105', KG320: '105', KG321: '120',
   KG322: '105', KG323: '121', KG326: '123', KG401: '109', KG404: '112', KG407: '115',
   GO002: '300', GO003: '301', GP002: '302', GP010: '303',
-  KI004: '201', KI005: '202', KI007: '215', KI101: '210', KI102: '211', KI103: '203', KI107: '205', KI109: '206', KI117: '208',
+  KI004: '201', KI005: '202', KI007: '215', KI101: '210', KI102: '211', KI103: '203', KI106: '204', KI107: '205',
+  KI109: '206', KI117: '208',
   KZ013: '124',
 };
 
-/** ISYBAU-Inspektionszweck (U101) -> M 150 Inspektionsgrund (Tabelle 201). */
+/** ISYBAU-Inspektionszweck (U101) -> M 150 Inspektionsgrund (Tabelle 201, Buchstaben). */
 const GRUND = { 1: 'E', 2: 'Z', 3: 'A', 4: 'G', 5: 'N', 6: 'V', 7: 'S', 8: 'Z' };
-/** ISYBAU-Inspektionsverfahren (U108) -> M 150 Inspektionsart (Tabelle 203). */
+/** ISYBAU-Inspektionsverfahren (U108) -> M 150 Inspektionsart (Tabelle 203, Buchstaben). */
 const ART = { 0: 'KTV', 1: 'BG', 2: 'SP', 3: 'Z' };
 
-const de = (v, dec = 2) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v).toFixed(dec).replace('.', ','));
+const fmtNum = (sep) => (v, dec = 2) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v).toFixed(dec).replace('.', sep));
 /** Quantifizierung: ohne überflüssige Nachkommastellen („300“, „0,8“). */
-const deQ = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : String(Math.round(Number(v) * 10) / 10).replace('.', ','));
+const fmtQ = (sep) => (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : String(Math.round(Number(v) * 10) / 10).replace('.', sep));
 const deDate = (iso) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : null);
+const isoDate = (iso) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : null);
 const key = (v) => (/^\d{1,6}$/.test(String(v || '')) ? String(v) : null);
+const refTexts = (list) => Object.fromEntries(list);
+
+/**
+ * Schlüsselvarianten. Beide sind gültiges M 150, weil jede Datei ihre Schlüssel in den
+ * RT-Tabellen selbst erklärt:
+ * - 'isybau': ISYBAU-Werte (Inspektionszweck, -verfahren, Wetter, Wasserhaltung …), Dezimalpunkt,
+ *   Datum JJJJ-MM-TT – so schreiben es verbreitete Kanalinspektionsprogramme.
+ * - 'dwa': Buchstabenschlüssel, Dezimalkomma, Datum TT.MM.JJJJ – wie die DWA-Beispieldatei.
+ */
+export const M150_VARIANTEN = [
+  ['isybau', 'ISYBAU-Schlüssel, Dezimalpunkt (wie gängige Kanalsoftware)'],
+  ['dwa', 'Buchstabenschlüssel, Dezimalkomma (wie DWA-Beispieldatei)'],
+];
+
+const VARIANTS = {
+  dwa: {
+    sep: ',',
+    date: deDate,
+    ki: (insp, project, hasPhotos) => ({
+      KI004: GRUND[project.zweck || '2'] || 'Z',
+      KI007: insp.status === 'fertig' ? 'E' : 'NE',
+      KI101: insp.bezugVertikal === '2' ? 'B' : 'A',
+      KI102: insp.bezugHorizontal === '2' ? 'B' : 'A',
+      KI103: ART[insp.verfahren ?? '2'] || 'SP',
+      KI106: null,
+      KI107: insp.reinigung ? 'J' : 'N',
+      KI109: insp.wasserhaltung && insp.wasserhaltung !== '1' ? 'J' : 'N',
+      KI117: hasPhotos ? 'DIGFOTO' : null,
+    }),
+    kg306: () => 'ZES',
+    rt: RT_TEXT,
+  },
+  isybau: {
+    sep: '.',
+    date: isoDate,
+    ki: (insp, project) => ({
+      KI004: project.zweck || '2',
+      KI007: null,
+      KI101: insp.bezugVertikal || '1',
+      KI102: insp.bezugHorizontal || '1',
+      KI103: insp.verfahren ?? '2',
+      KI106: insp.wetter || null,
+      KI107: insp.reinigung ? '1' : '0',
+      KI109: insp.wasserhaltung || '1',
+      KI117: null,
+    }),
+    kg306: (m) => m.schacht?.funktion || '1',
+    rt: {
+      ...RT_TEXT,
+      '117': refTexts(REF.G301),
+      '201': refTexts(REF.U101),
+      '203': refTexts(REF.U108),
+      '204': refTexts(REF.U106),
+      '205': { 1: 'Vor Inspektion gereinigt', 0: 'Vor Inspektion nicht gereinigt' },
+      '206': refTexts(REF.U107),
+      '210': refTexts(REF.U115),
+      '211': refTexts(REF.U116),
+    },
+  },
+};
 
 export function m150Kodiersystem(kodiersystem) {
   return kodiersystem === '9' ? 'DWAM149-2:2013' : 'EN13508';
 }
 
-function kzFromRecord(r) {
+function kzFromRecord(r, V) {
+  const num = fmtNum(V.sep), q = fmtQ(V.sep);
   const ddb = r.InspektionsKode === 'DDB';
   const def = CODES[r.InspektionsKode];
   const langtext = ddb
     ? (r.Streckenschaden === 'A' ? 'Inspektionsanfang' : 'Inspektionsende') + (r.Kommentar ? ` - ${r.Kommentar}` : '')
     : [def?.name, r.Kommentar].filter(Boolean).join(' - ');
   return [
-    ['KZ001', de(r.VertikaleLage)],
+    ['KZ001', num(r.VertikaleLage)],
     ['KZ002', r.InspektionsKode],
     ['KZ014', r.Charakterisierung1 || null],
     ['KZ015', r.Charakterisierung2 || null],
-    ['KZ003', deQ(r.Quantifizierung1Numerisch)],
-    ['KZ004', deQ(r.Quantifizierung2Numerisch)],
+    ['KZ003', q(r.Quantifizierung1Numerisch)],
+    ['KZ004', q(r.Quantifizierung2Numerisch)],
     ['KZ005', !ddb && r.Streckenschaden ? `${r.Streckenschaden}${r.StreckenschadenLfdNr || ''}` : null],
     ['KZ006', r.PositionVon || '00'],
     ['KZ007', r.PositionBis || '00'],
@@ -257,8 +327,9 @@ function kzFromRecord(r) {
   ];
 }
 
-function deckelGeometrie(manhole, project) {
+function deckelGeometrie(manhole, project, V) {
   if (manhole.x == null || manhole.y == null) return null;
+  const num = fmtNum(V.sep);
   const crs = detectCrs(manhole.x, manhole.y, manhole.crs || project.crsLage || '');
   const gk = crs?.kind === 'gk';
   const hs = /DHHN(92|2016)|NHN/i.test(project.crsHoehe || '') ? 'NHN' : 'mNN';
@@ -269,16 +340,16 @@ function deckelGeometrie(manhole, project) {
     ['GP', [
       ['GP001', manhole.name],
       ['GP002', gk ? 'GK' : 'UTM'],
-      [gk ? 'GP003' : 'GP005', de(manhole.x, 3)],
-      [gk ? 'GP004' : 'GP006', de(manhole.y, 3)],
-      ['GP007', de(manhole.deckelhoehe, 3)],
+      [gk ? 'GP003' : 'GP005', num(manhole.x, 3)],
+      [gk ? 'GP004' : 'GP006', num(manhole.y, 3)],
+      ['GP007', num(manhole.deckelhoehe, 3)],
       ['GP010', manhole.deckelhoehe != null ? hs : null],
     ]],
   ]];
 }
 
 /** Stammdatenfelder des Knotens: aus M-150-Import übernehmen, sonst aus ISYBAU ableiten. */
-function kgFields(manhole, insp) {
+function kgFields(manhole, insp, V) {
   const raw = manhole.extra?.m150 || {};
   const tiefe = manhole.tiefe ?? (insp.tiefe === '' ? null : insp.tiefe);
   const nutzung = { KS: 'S', KR: 'R', KM: 'M', DS: 'S', DR: 'R', DM: 'M' }[manhole.entwaesserungsart] || null;
@@ -287,25 +358,25 @@ function kgFields(manhole, insp) {
     KG102: manhole.strasse || null,
     KG103: key(manhole.ortsteilschluessel),
     KG104: manhole.ortsteil || null,
-    KG211: de(tiefe, 2),
     KG302: nutzung,
     KG305: 'S',
-    KG306: 'ZES',
+    KG306: V.kg306(manhole),
     ...raw,
   };
   delete f.KG001;
-  if (tiefe != null) f.KG211 = de(tiefe, 2);
+  if (tiefe != null) f.KG211 = fmtNum(V.sep)(tiefe, 2);
   return Object.keys(f).filter((k) => /^KG\d{3}$/.test(k) && f[k] != null && f[k] !== '').sort().map((k) => [k, f[k]]);
 }
 
 /**
  * @param {object} p
- * @param {object} p.project
+ * @param {object} p.project   u. a. m150Variante: 'isybau' (Standard) | 'dwa'
  * @param {Array}  p.items     [{inspection, manhole}]
  * @param {object} p.settings  {company}
  * @returns {{xml:string, bytes:Uint8Array, photos:Array<{id,file}>, count:number}}
  */
-export function exportM150({ project, items, settings = {} }) {
+export function exportM150({ project, items, settings = {}, variante = project.m150Variante || 'isybau' }) {
+  const V = VARIANTS[variante] || VARIANTS.isybau;
   const photos = [];
   const w = new XmlWriter();
   w.el('FD', [['FD001', '04-2010'], ['FD002', 'B']], 1);
@@ -336,37 +407,39 @@ export function exportM150({ project, items, settings = {} }) {
     for (const [t, m] of Object.entries(manhole.extra?.m150rt || {})) Object.assign(labels[t], m);
     const uhrzeit = insp.uhrzeit ? (insp.uhrzeit.length === 5 ? insp.uhrzeit + ':00' : insp.uhrzeit) : null;
     const temp = insp.temperatur === '' || insp.temperatur == null ? null : String(Math.round(Number(insp.temperatur)));
+    const k = V.ki(insp, project, own.length > 0);
     const ki = [
       ['KI001', project.auftraggeber || null],
       ['KI002', String(project.auftragNummer || '').slice(0, 8) || null],
-      ['KI004', GRUND[project.zweck || '2'] || 'Z'],
+      ['KI004', k.KI004],
       ['KI005', m150Kodiersystem(project.kodiersystem)],
-      ['KI007', insp.status === 'fertig' ? 'E' : 'NE'],
-      ['KI101', insp.bezugVertikal === '2' ? 'B' : 'A'],
-      ['KI102', insp.bezugHorizontal === '2' ? 'B' : 'A'],
-      ['KI103', ART[insp.verfahren ?? '2'] || 'SP'],
-      ['KI104', deDate(insp.datum)],
+      ['KI007', k.KI007],
+      ['KI101', k.KI101],
+      ['KI102', k.KI102],
+      ['KI103', k.KI103],
+      ['KI104', V.date(insp.datum)],
       ['KI105', uhrzeit],
-      ['KI107', insp.reinigung ? 'J' : 'N'],
+      ['KI106', k.KI106],
+      ['KI107', k.KI107],
       ['KI108', temp],
-      ['KI109', insp.wasserhaltung && insp.wasserhaltung !== '1' ? 'J' : 'N'],
+      ['KI109', k.KI109],
       ['KI111', (settings.company || '') || null],
       ['KI112', insp.inspekteur || null],
-      ['KI117', own.length ? 'DIGFOTO' : null],
+      ['KI117', k.KI117],
       ['KI118', overview],
       ['KI999', insp.bemerkung || null],
-      ...records.map((r) => ['KZ', kzFromRecord(r)]),
+      ...records.map((r) => ['KZ', kzFromRecord(r, V)]),
     ];
     w.el('KG', collect([
       ['KG001', manhole.name],
-      ...kgFields(manhole, insp),
-      deckelGeometrie(manhole, project),
+      ...kgFields(manhole, insp, V),
+      deckelGeometrie(manhole, project, V),
       ['KI', ki],
     ]), 1);
   }
 
   for (const t of [...used.keys()].sort()) {
-    const texts = RT_TEXT[t] || labels[t] || {};
+    const texts = V.rt[t] || labels[t] || {};
     for (const k of used.get(t)) w.el('RT', [['RT001', t], ['RT002', k], ['RT004', texts[k] || k]], 1);
   }
 

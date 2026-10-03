@@ -2,8 +2,8 @@
 
 import { h, clear, btn, icon, sheet, toast, menu, field, input, numInput, select, confirmDialog, empty, badge } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
-import { getProject, saveProject, listManholes, addManhole, deleteProject } from '../core/store.js';
-import { REF } from '../data/reflists.js';
+import { getProject, saveProject, listManholes, addManhole, deleteProject, saveInspection, getInspection } from '../core/store.js';
+import { REF, BEZUG_VERTIKAL } from '../data/reflists.js';
 import { fmtM, num } from '../core/util.js';
 import { distance, navUrl } from '../lib/geo.js';
 import { importFlow } from './projects.js';
@@ -124,13 +124,23 @@ export async function renderProject(view, projectId, params) {
         field('Inspektionszweck', select(p.zweck, REF.U101, (v) => (p.zweck = v))),
         field('Kodiersystem', select(p.kodiersystem, REF.U102, (v) => (p.kodiersystem = v)),
           'ISYBAU (BFR Abwasser) ist strenger als DWA-M 149-2 – die Hauptkodes sind identisch.'),
-        field('Vertikaler Bezugspunkt (Standard für neue Inspektionen)', select(p.bezugVertikal, REF.U115, (v) => (p.bezugVertikal = v))),
+        field('Höhenangaben (vertikaler Bezugspunkt)', select(p.bezugVertikal || '1', BEZUG_VERTIKAL, (v) => (p.bezugVertikal = v)),
+          'Wie der Auftraggeber es verlangt. Inspektionsanfang ist immer 0,00 m. Eingaben „ab Deckel“ oder „über Sohle“ werden beim Export umgerechnet.'),
         field('Abgabeformat', select(p.exportFormat || '2017-07', EXPORT_FORMATS, (v) => (p.exportFormat = v)), 'Was der Auftraggeber verlangt – im Export änderbar.'),
         h('div', { class: 'grid2' },
           field('Liegenschaft Nr.', input(p.liegenschaftNummer, (v) => (p.liegenschaftNummer = v), { maxlength: 20 })),
           field('Liegenschaft Name', input(p.liegenschaftBezeichnung, (v) => (p.liegenschaftBezeichnung = v), { maxlength: 40 }))),
         h('p', { class: 'muted small' }, 'Liegenschaft ist nur in ISYBAU 2006/2013 Pflicht; leer = Auftragsnummer bzw. Projektname.')),
       actions: [btn('Speichern', { variant: 'primary', onClick: async () => {
+        // Richtung geändert: vorhandene Inspektionen auf Wunsch mitnehmen (Werte bleiben wie erfasst)
+        const other = (p.bezugVertikal || '1') !== (project.bezugVertikal || '1')
+          ? manholes.map((m) => m.inspection).filter((i) => i && (i.bezugVertikal || '1') !== p.bezugVertikal) : [];
+        if (other.length && await confirmDialog(`Höhenangaben auch für die ${other.length} vorhandene(n) Inspektion(en) auf „${p.bezugVertikal === '2' ? 'von oben' : 'von unten'}“ umstellen?`, { ok: 'Umstellen' })) {
+          for (const { id } of other) {
+            const fresh = await getInspection(id); // aktuellen Stand nehmen, nichts überschreiben
+            if (fresh) { fresh.bezugVertikal = p.bezugVertikal; await saveInspection(fresh); }
+          }
+        }
         Object.assign(project, p);
         await saveProject(project);
         s.close();

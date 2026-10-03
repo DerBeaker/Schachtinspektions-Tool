@@ -75,6 +75,12 @@ export const REF = {
   ],
 };
 
+/** Verständliche Auswahl für den vertikalen Bezugspunkt (Werte = U115). */
+export const BEZUG_VERTIKAL = [
+  ['1', 'von unten: Sohle = 0,00 m, Deckel = Schachttiefe'],
+  ['2', 'von oben: Deckel = 0,00 m, Sohle = Schachttiefe'],
+];
+
 export function refLabel(list, key) {
   const e = (REF[list] || []).find(([k]) => String(k) === String(key));
   return e ? e[1] : key ?? '';

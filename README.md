@@ -8,14 +8,14 @@ Web-App für Inspekteure: **Schacht von oben fotografieren, Anschlüsse und Sch�
 
 | Bereich | Funktion |
 |---|---|
-| **Stammdaten** | Import von ISYBAU-XML (2006, 2013, 2017, 2024) und **DWA-M 150**: Schächte, Tiefen, Deckel-/Sohlhöhen, Koordinaten, angeschlossene Haltungen/Leitungen. Fehlt die Deckelhöhe, wird sie aus Sohlhöhe + Schachttiefe berechnet |
+| **Stammdaten** | Import von ISYBAU-XML (2006, 2013, 2017, 2024) und **DWA-M 150**: Schächte, Tiefen, Deckel-/Sohlhöhen, Koordinaten, angeschlossene Haltungen/Leitungen. Fehlt die Deckelhöhe, wird sie aus Sohlhöhe + Schachttiefe berechnet. Enthält eine Datei nur Haltungen (keine Schachtobjekte), werden die Schächte aus den Haltungsenden abgeleitet |
 | **Anschlüsse automatisch** | Lage am Umfang (Uhrzeit, Auslauf = 12 Uhr) wird aus der Leitungsgeometrie **berechnet**, Höhen aus den Sohlhöhen. Bei den offiziellen ISYBAU-Beispieldaten stimmt das bei 100 von 113 Schächten exakt mit der echten Inspektion überein, der Rest weicht um eine Stunde ab. |
 | **Foto von oben** | Foto aufnehmen, Zifferblatt per Fingerzug auf den Schacht legen (Mittelpunkt, Radius, 12 Uhr = tiefster Auslauf), Rohröffnungen antippen → Uhrzeit wird übernommen |
 | **Kodierung** | Vollständiger Kodekatalog für Schächte nach DIN EN 13508-2 / BFR Abwasser (ISYBAU, Stand 01/2025) bzw. DWA-M 149-2: abhängige Charakterisierungen, Quantifizierungen mit Einheiten, Lage am Umfang (Punkt/Bereich), Schachtbereich A–J per Schnittbild, Streckenfeststellungen, Fotos je Befund |
-| **Tiefen oben oder unten** | Jede Höhenlage wahlweise „ab OK Deckel“ oder „über Sohle“ eingeben – die App rechnet automatisch auf den gewählten ISYBAU-Bezugspunkt um |
+| **Höhenangaben von unten oder oben** | Pro Projekt (und je Inspektion) umschaltbar, wie der Auftraggeber es verlangt: **von unten** (Anfang an der Sohle = 0,00 m, Ende am Deckel = Schachttiefe, Standard) oder **von oben** (Deckel = 0,00 m). Erfasst wird wahlweise „ab OK Deckel“ oder „über Sohle“ – die App rechnet beim Export um, deshalb lässt sich die Richtung auch nachträglich ändern |
 | **Laser-Entfernungsmesser** | Geräte mit Bluetooth-Tastaturmodus (HID) funktionieren auf Android und iPhone: Feld antippen, messen – „2,345 m“ oder „2345 mm“ wird umgerechnet, Enter springt ins nächste Feld |
 | **Plausibilitätsprüfung** | Regeln aus dem Kodierhandbuch (z. B. DAB B erst ab 0,5 mm, „Z“ braucht eine Anmerkung, DAO/DAP nur mit Primärschaden, Pflichtfelder) – live beim Erfassen |
-| **Export** | **ISYBAU-XML 2006, 2013, 2017 oder 2024** (Zustandsdaten, jeweils gegen das **offizielle XSD-Schema geprüft**) oder **DWA-M 150 Typ B** – Kodierung nach BFR Abwasser oder DWA-M 149-2, Format pro Projekt wählbar. ZIP mit Fotos nach Namenskonvention (`S1005-001.jpg`) |
+| **Export** | **ISYBAU-XML 2006, 2013, 2017 oder 2024** (Zustandsdaten, jeweils gegen das **offizielle XSD-Schema geprüft**) oder **DWA-M 150 Typ B** (wahlweise mit ISYBAU-Schlüsseln und Dezimalpunkt wie gängige Kanalsoftware oder wie die DWA-Beispieldatei) – Kodierung nach BFR Abwasser oder DWA-M 149-2, Format pro Projekt wählbar. ZIP mit Fotos nach Namenskonvention (`S1005-001.jpg`) |
 | **Protokoll** | Druckbares Schachtprotokoll (Browser → „Als PDF speichern“) |
 | **Offline** | Läuft ohne Netz weiter (PWA). Alle Daten liegen zuerst auf dem Gerät |
 | **Navigation** | „Schächte in der Nähe“ per GPS und Navigation zum Schacht (UTM- und Gauß-Krüger-Koordinaten werden umgerechnet) |

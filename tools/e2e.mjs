@@ -131,9 +131,29 @@ async function exportAs(format) {
   const expect = (re, msg) => { if (!re.test(z)) errors.push('M150: ' + msg); };
   expect(/<DATA>\s*<FD>\s*<FD001>04-2010<\/FD001>\s*<FD002>B<\/FD002>/, 'Kopf FD fehlt');
   expect(/<KG001>S1005<\/KG001>/, 'Knoten S1005 fehlt');
-  expect(/<KZ001>1,52<\/KZ001>\s*<KZ002>DAB<\/KZ002>\s*<KZ014>B<\/KZ014>\s*<KZ015>A<\/KZ015>\s*<KZ003>0,8<\/KZ003>/, 'DAB mit Dezimalkomma fehlt');
+  expect(/<KZ001>1\.52<\/KZ001>\s*<KZ002>DAB<\/KZ002>\s*<KZ014>B<\/KZ014>\s*<KZ015>A<\/KZ015>\s*<KZ003>0\.8<\/KZ003>/, 'DAB (ISYBAU-Schlüssel, Dezimalpunkt) fehlt');
+  expect(/<KI101>1<\/KI101>/, 'Höhenangabe von unten (KI101 = 1) fehlt');
   expect(/<KZ005>A1<\/KZ005>/, 'Streckenschaden A1 fehlt');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
+}
+
+step('Höhenangaben auf „von oben“ umstellen');
+await page.goBack();
+await page.getByText('S1005', { exact: true }).click();
+await page.getByRole('tab', { name: /Daten/ }).click();
+await page.getByRole('radio', { name: 'von oben ↓' }).click();
+await page.getByText('Anfang am Deckel = 0,00 m').waitFor();
+await shot('12c-von-oben');
+await page.goBack();
+await page.getByRole('button', { name: 'Export', exact: true }).click();
+await page.getByRole('button', { name: 'Exportieren' }).waitFor();
+{
+  const z = await exportAs('2017-07');
+  const expect = (re, msg) => { if (!re.test(z)) errors.push('Von oben: ' + msg); };
+  expect(/<BezugspunktVertikal>2<\/BezugspunktVertikal>/, 'Bezugspunkt 2 fehlt');
+  expect(/<VertikaleLage>0\.00<\/VertikaleLage>\s*<InspektionsKode>DDB<\/InspektionsKode>\s*<Streckenschaden>A</, 'DDB A bei 0,00 (Deckel) fehlt');
+  expect(/<VertikaleLage>0\.90<\/VertikaleLage>\s*<InspektionsKode>DAB</, 'DAB 0,90 m ab Deckel fehlt');
+  expect(/<VertikaleLage>2\.42<\/VertikaleLage>\s*<InspektionsKode>DDB<\/InspektionsKode>\s*<Streckenschaden>B</, 'DDB B bei 2,42 (Sohle) fehlt');
 }
 
 step('Protokoll');

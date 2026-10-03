@@ -4,7 +4,7 @@ import { XmlWriter, esc, encodeLatin1 } from './xml.js';
 import { buildRecords, KZUSTAND_ORDER } from './model.js';
 
 export const APP_NAME = 'Schachtblick';
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';
 
 const NS_OFD = 'http://www.ofd-hannover.la/Identifikation';
 const NS_BFR = 'http://www.bfr-abwasser.de';
