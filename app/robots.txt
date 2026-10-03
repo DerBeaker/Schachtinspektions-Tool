@@ -1,0 +1,6 @@
+# Schachtblick – Suchmaschinen dürfen App und Info-Seite lesen, die Server-Schnittstelle nicht
+User-agent: *
+Disallow: /api/
+Allow: /
+
+Sitemap: https://schachtblick.mmse-software.com/sitemap.xml

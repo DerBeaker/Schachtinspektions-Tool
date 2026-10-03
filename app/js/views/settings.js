@@ -10,7 +10,7 @@ import { APP_NAME, APP_VERSION, VENDOR, VENDOR_URL, VENDOR_WEB, VENDOR_TAGLINE }
 import { pickFile } from '../lib/image.js';
 import { debounce, fmtDate } from '../core/util.js';
 import { rechtsLinks } from './rechtliches.js';
-import { planText, spendenLink } from './konto.js';
+import { planText, spendenLink, weiterempfehlen } from './konto.js';
 
 export function lizenzText(l) {
   const teile = [];
@@ -303,6 +303,9 @@ export async function renderSettings(view) {
         h('p', { class: 'muted small' }, 'Kodiersystem: DIN EN 13508-2:2011 mit nationaler Festlegung nach BFR Abwasser (ISYBAU, Stand 01/2025) bzw. DWA-M 149-2. Austauschformate: ISYBAU XML-2006, -2013, -2017, -2024 und DWA-M 150.'),
         h('p', { class: 'muted small' }, 'Die Kodierung bleibt fachliche Verantwortung des Inspekteurs. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel und ersetzen keine Prüfung bzw. kein Aufmaß.'),
         h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · `, rechtsLinks(), ' · ', h('a', { href: '#/agb' }, 'Nutzungsbedingungen')),
+        h('div', { class: 'row wrap' },
+          btn('App weiterempfehlen', { icon: 'upload', variant: 'soft', small: true, onClick: weiterempfehlen }),
+          h('a', { class: 'btn btn-ghost btn-sm', href: './schachtinspektion.html' }, 'Was ist Schachtblick?')),
         h('p', { class: 'small' }, spendenLink(`${APP_NAME} gefällt Ihnen? Freiwillig unterstützen (PayPal)`)),
         h('p', { class: 'muted small' }, 'Kartendaten © basemap.de / BKG, © OpenStreetMap-Mitwirkende · Leaflet (BSD-2-Clause) · three.js (MIT)')))));
   renderServer();

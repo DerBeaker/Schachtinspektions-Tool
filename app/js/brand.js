@@ -14,7 +14,10 @@ export const DATENSCHUTZ_WEB_URL = 'https://www.mmse-software.com/datenschutz.ht
 // Verantwortlicher (wie im Impressum der Website)
 export const VENDOR_INHABER = 'Manuel Moldan';
 export const VENDOR_ANSCHRIFT = 'Am Wingert 18, 63579 Freigericht';
-export const VENDOR_EMAIL = 'info@mmse-software.com';
+// Kontakt für App, Datenschutz, AVV und Pro-Anfragen (Absender der E-Mails: noreply@… in api/config.php)
+export const VENDOR_EMAIL = 'info@schachtblick.mmse-software.com';
+// Öffentliche Adresse der App (auch fest in index.html, schachtinspektion.html, robots.txt, sitemap.xml)
+export const APP_URL = 'https://schachtblick.mmse-software.com/';
 // Freiwillige Unterstützung (Spende ohne Gegenleistung)
 export const SPENDEN_URL = 'https://www.paypal.com/paypalme/derbeaker';
 // Anzeige der Preise, solange der Server keine liefert (Demo, offline); maßgeblich sind die

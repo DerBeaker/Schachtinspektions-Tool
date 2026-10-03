@@ -18,7 +18,7 @@ return [
     'session_days' => 30,
 
     // Adresse der App für Links in E-Mails (Einladungen, „Passwort vergessen“).
-    // Leer = automatisch (Ordner über api/), z. B. 'https://app.mmse-software.com/'
+    // Leer = automatisch (Ordner über api/), z. B. 'https://schachtblick.mmse-software.com/'
     'app_url' => '',
     // E-Mails (Einladungen, „Passwort vergessen“). Empfohlen bei IONOS: Versand per SMTP über ein
     // vorhandenes Postfach der eigenen Domain (im IONOS-Kundenbereich unter „E-Mail“ anlegen).
@@ -26,15 +26,15 @@ return [
     // 'smtp' => [
     //     'host' => 'smtp.ionos.de',
     //     'port' => 465,                         // 465 = SSL, 587 = STARTTLS
-    //     'user' => 'noreply@mmse-software.com', // Postfach-Adresse
+    //     'user' => 'noreply@schachtblick.mmse-software.com', // Postfach-Adresse
     //     'pass' => 'POSTFACH-PASSWORT',
     // ],
     // Absender (Standard: das SMTP-Postfach). Muss ein Postfach der eigenen Domain sein.
-    'mail_from' => 'noreply@mmse-software.com',
+    'mail_from' => 'noreply@schachtblick.mmse-software.com',
     // false = keine E-Mails senden (Links werden dann nur in der App angezeigt)
     'mail' => true,
     // Benachrichtigungen über Registrierungen, Buchungen und Kündigungen (leer = E-Mail des Betreiber-Kontos)
-    'betreiber_email' => '',
+    'betreiber_email' => '',   // z. B. 'info@schachtblick.mmse-software.com'
 
     // Nur nötig, wenn App und API auf unterschiedlichen Domains liegen, z. B. ['https://app.example.de']
     'cors_origins' => [],

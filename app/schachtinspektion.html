@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Schachtinspektion per App – kostenlos | Schachtblick</title>
+  <meta name="description" content="Kostenlose App für die Schachtinspektion: Schacht von oben fotografieren, Anschlüsse und Schäden nach DIN EN 13508-2 (ISYBAU, DWA-M 149-2) kodieren, Zustandsklassen nach BFR Abwasser, PDF-Schachtprotokoll und Aufmaß. Im Browser, ohne Installation, auch offline.">
+  <link rel="canonical" href="https://schachtblick.mmse-software.com/schachtinspektion.html">
+  <meta name="theme-color" content="#0a5bd3">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:site_name" content="Schachtblick">
+  <meta property="og:title" content="Schachtinspektion per App – kostenlos | Schachtblick">
+  <meta property="og:description" content="Schacht fotografieren, Anschlüsse und Schäden kodieren, Zustandsklasse und PDF-Protokoll – nach ISYBAU und DWA-M 149-2. Im Browser, ohne Installation.">
+  <meta property="og:url" content="https://schachtblick.mmse-software.com/schachtinspektion.html">
+  <meta property="og:image" content="https://schachtblick.mmse-software.com/og-bild.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Schachtblick: App-Ansicht eines Schachts mit Uhr und Anschlüssen">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Schachtblick",
+    "url": "https://schachtblick.mmse-software.com/",
+    "description": "Web-App für die Inspektion von Abwasserschächten nach ISYBAU (BFR Abwasser) und DWA-M 149-2 (DIN EN 13508-2): Foto von oben, Kodierung von Anschlüssen und Schäden, Zustandsklassen, PDF-Schachtprotokoll, Aufmaß, Export als ISYBAU-XML und DWA-M 150.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web-Browser (Android, iOS, Windows, macOS)",
+    "inLanguage": "de",
+    "image": "https://schachtblick.mmse-software.com/og-bild.jpg",
+    "offers": [
+      { "@type": "Offer", "name": "Schachtblick Basis", "price": "0", "priceCurrency": "EUR" },
+      { "@type": "Offer", "name": "Schachtblick Pro (je Monat)", "price": "25", "priceCurrency": "EUR" }
+    ],
+    "publisher": { "@type": "Organization", "name": "MMSE Software Engineering", "url": "https://www.mmse-software.com" }
+  }
+  </script>
+  <style>
+    :root { --bg: #eef2f7; --surface: #fff; --text: #0e1726; --muted: #5b6b80; --border: #dbe3ee; --primary: #0a5bd3; --primary-soft: #e3edfc; --ok: #0f7a44; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0b1220; --surface: #121b2d; --text: #e8eef8; --muted: #94a3b8; --border: #24324c; --primary: #4c8dff; --primary-soft: #16294d; --ok: #4ade80; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--primary); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+    header { background: linear-gradient(135deg, #0a5bd3, #00a3c4); color: #fff; padding: 22px 0 44px; }
+    .marke { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.15rem; color: #fff; text-decoration: none; }
+    .marke svg { width: 34px; height: 34px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: center; margin-top: 26px; }
+    h1 { font-size: clamp(1.9rem, 4.6vw, 2.9rem); line-height: 1.12; margin: 0 0 14px; }
+    .lead { font-size: 1.12rem; opacity: .95; margin: 0 0 22px; }
+    .knoepfe { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 14px; font-weight: 700; text-decoration: none; }
+    .btn-hell { background: #fff; color: #0a5bd3; }
+    .btn-rand { border: 2px solid rgba(255,255,255,.8); color: #fff; }
+    .klein { font-size: .9rem; opacity: .9; margin-top: 12px; }
+    .handy { justify-self: center; width: min(280px, 80vw); border-radius: 36px; background: #0b1220; padding: 10px; box-shadow: 0 24px 50px rgba(0,0,0,.3); }
+    .handy img { display: block; width: 100%; height: auto; border-radius: 28px; }
+    main section { padding: 36px 0 8px; }
+    h2 { font-size: 1.5rem; margin: 0 0 14px; line-height: 1.25; }
+    .karten { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+    .karte { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+    .karte h3 { margin: 0 0 6px; font-size: 1.05rem; }
+    .karte p { margin: 0; color: var(--muted); font-size: .95rem; }
+    ol.schritte { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+    ol.schritte li { counter-increment: s; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px 14px 58px; position: relative; }
+    ol.schritte li::before { content: counter(s); position: absolute; left: 16px; top: 14px; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 800; display: grid; place-items: center; font-size: .9rem; }
+    .bilder { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    figure { margin: 0; text-align: center; }
+    figure img { width: 100%; height: auto; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); }
+    figcaption { color: var(--muted); font-size: .9rem; margin-top: 6px; }
+    .preis { font-size: 1.8rem; font-weight: 800; }
+    .pro { border: 2px solid var(--primary); }
+    ul.haken { list-style: none; padding: 0; margin: 10px 0 0; }
+    ul.haken li { padding-left: 26px; position: relative; margin: 4px 0; font-size: .95rem; }
+    ul.haken li::before { content: "✓"; position: absolute; left: 4px; color: var(--ok); font-weight: 800; }
+    details { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; margin-bottom: 10px; }
+    summary { cursor: pointer; font-weight: 700; }
+    details p { color: var(--muted); margin: 8px 0 0; }
+    .cta { text-align: center; padding: 34px 0 10px; }
+    .cta .btn { background: var(--primary); color: #fff; }
+    footer { color: var(--muted); font-size: .9rem; text-align: center; padding: 28px 0 36px; }
+    footer a { color: inherit; }
+    @media (max-width: 760px) {
+      .hero { grid-template-columns: 1fr; }
+      .bilder { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="marke" href="./"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="7"><circle cx="50" cy="50" r="42"/><circle cx="50" cy="50" r="24"/><path d="M50 4v16M50 80v16M4 50h16M80 50h16"/></g></svg>Schachtblick</a>
+    <div class="hero">
+      <div>
+        <h1>Schachtinspektion per App – kostenlos im Browser</h1>
+        <p class="lead">Schacht von oben fotografieren, Anschlüsse antippen, Schäden kodieren – mit Zustandsklasse, PDF-Schachtprotokoll und Aufmaß. Nach ISYBAU (BFR Abwasser) und DWA-M 149-2. Ohne Installation, ohne Anmeldung, auch ohne Netz.</p>
+        <div class="knoepfe">
+          <a class="btn btn-hell" href="./">App kostenlos starten</a>
+          <a class="btn btn-rand" href="./#/pro">Tarife ansehen</a>
+        </div>
+        <p class="klein">Läuft auf Handy, Tablet und PC. Tipp: im Browser „Zum Startbildschirm hinzufügen“.</p>
+      </div>
+      <div class="handy"><img src="bilder/app-foto.jpg" width="780" height="1560" alt="Schachtblick: Foto eines Schachts von oben mit Uhr, Auslauf bei 12 Uhr und Zuläufen"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>So funktioniert die Schachtinspektion mit Schachtblick</h2>
+    <ol class="schritte">
+      <li><b>Stammdaten importieren:</b> ISYBAU-XML (2006, 2013, 2017, 2024) oder DWA-M 150 – Schächte, Tiefen und Haltungen sind sofort da, auf Wunsch mit der letzten Inspektion. Ohne Datei legen Sie Schächte einfach von Hand an.</li>
+      <li><b>Foto von oben:</b> Die Uhr wird auf den Schacht gelegt, der Auslauf steht bei 12 Uhr. Anschlüsse tippen Sie direkt im Foto an; Lage und Höhe aus den Stammdaten werden zugeordnet.</li>
+      <li><b>Schäden kodieren:</b> Katalog nach DIN EN 13508-2 mit nationaler Festlegung (BFR Abwasser 01/2025 bzw. DWA-M 149-2), Plausibilitätsprüfung, Strecken­schäden, Uhrzeiger-Lage, Messwerte vom Bluetooth-Laser.</li>
+      <li><b>Ergebnis abgeben:</b> Zustandsklasse nach BFR Abwasser Anhang A-3, PDF-Schachtprotokoll mit Ihrem Logo, Aufmaß als PDF oder Excel – und mit Pro die Austauschdatei für den Auftraggeber.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Aus der App</h2>
+    <div class="bilder">
+      <figure><img src="bilder/app-foto.jpg" width="780" height="1560" loading="lazy" alt="Schachtfoto mit Uhr und Anschlüssen"><figcaption>Foto mit Uhr und Anschlüssen</figcaption></figure>
+      <figure><img src="bilder/app-befunde.jpg" width="780" height="1560" loading="lazy" alt="Befunde mit Zustandsklasse nach BFR Abwasser"><figcaption>Befunde und Zustandsklasse</figcaption></figure>
+      <figure><img src="bilder/app-aufbau.jpg" width="780" height="1560" loading="lazy" alt="3D-Modell des Schachts aus der Bauteilbeschreibung"><figcaption>Bauteile und 3D-Schachtmodell</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Was Schachtblick kann</h2>
+    <div class="karten">
+      <div class="karte"><h3>Kodierung nach Norm</h3><p>DIN EN 13508-2 mit ISYBAU- bzw. DWA-M-149-2-Festlegung, Prüfung der Pflichtangaben wie im Kodierhandbuch.</p></div>
+      <div class="karte"><h3>Zustandsklassen</h3><p>Bewertung je Befund und Objektklasse 0–5 nach BFR Abwasser Anhang A-3.</p></div>
+      <div class="karte"><h3>Bauteile &amp; 3D</h3><p>Abdeckung, Auflageringe, Konus, Unterteil, Gerinne, Steighilfen – mit Höhenbilanz und 3D-Modell.</p></div>
+      <div class="karte"><h3>Protokoll &amp; Aufmaß</h3><p>PDF-Schachtprotokoll mit Fotos und Firmenlogo, Aufmaß nach Tiefenstaffel als PDF oder Excel.</p></div>
+      <div class="karte"><h3>Karte</h3><p>Alle Schächte auf der Karte, Status auf einen Blick, Navigation zum nächsten Schacht.</p></div>
+      <div class="karte"><h3>Offline</h3><p>Funktioniert ohne Netz; Daten werden auf dem Gerät gespeichert. Keine Cookies, kein Tracking.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kostenlos – oder Pro für das Team</h2>
+    <div class="karten">
+      <div class="karte">
+        <h3>Schachtblick Basis</h3>
+        <div class="preis">kostenlos</div>
+        <p>ohne Anmeldung – alle Daten bleiben auf Ihrem Gerät</p>
+        <ul class="haken"><li>Import, Foto, Kodierung, Zustandsklassen</li><li>PDF-Schachtprotokoll und Aufmaß</li><li>Bauteile, 3D-Modell, Karte</li></ul>
+      </div>
+      <div class="karte pro">
+        <h3>Schachtblick Pro</h3>
+        <div class="preis">25 € <span style="font-size:1rem;font-weight:600">/ Monat</span></div>
+        <p>ohne Umsatzsteuer (Kleinunternehmer nach § 19 UStG), inkl. 3 Benutzer, monatlich kündbar</p>
+        <ul class="haken"><li>alles aus Basis</li><li>Export ISYBAU-XML 2006–2024 und DWA-M 150 mit Fotos</li><li>Firmenkonto: Handy, Tablet und PC gleichen sich ab</li><li>Benutzer einladen, Firmendaten zentral</li></ul>
+        <p style="margin-top:10px"><a href="./#/pro">Details und Test →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Häufige Fragen</h2>
+    <details><summary>Ist Schachtblick wirklich kostenlos?</summary><p>Ja. Schachtblick Basis ist dauerhaft kostenlos und ohne Anmeldung nutzbar. Kostenpflichtig ist nur Pro mit Firmenkonto, XML-Export und Abgleich zwischen Geräten.</p></details>
+    <details><summary>Muss ich etwas installieren?</summary><p>Nein. Schachtblick läuft im Browser (Chrome, Safari, Edge, Firefox). Auf dem Handy können Sie die App über „Zum Startbildschirm hinzufügen“ wie eine normale App starten.</p></details>
+    <details><summary>Wo liegen meine Daten?</summary><p>In Basis ausschließlich im Speicher des Browsers auf Ihrem Gerät – niemand sonst kann sie sehen. Mit Pro zusätzlich im Firmenkonto auf einem Server in Deutschland; jede Firma sieht nur ihre eigenen Daten. Mehr in den <a href="./#/datenschutz">Datenschutzhinweisen</a>.</p></details>
+    <details><summary>Welche Formate werden unterstützt?</summary><p>Import: ISYBAU-XML 2006, 2013, 2017, 2024 und DWA-M 150, jeweils auch mit Vorinspektionen. Export (Pro): ISYBAU-XML 2006, 2013, 2017, 2024 – geprüft gegen die offiziellen XSD-Schemata – und DWA-M 150 Typ B, jeweils mit Fotos als ZIP.</p></details>
+    <details><summary>Funktioniert das auch ohne Netz im Schacht?</summary><p>Ja. Nach dem ersten Aufruf arbeitet die App offline. Mit Pro wird automatisch abgeglichen, sobald wieder Netz da ist.</p></details>
+  </section>
+
+  <div class="cta"><a class="btn" href="./">Jetzt kostenlos ausprobieren</a></div>
+</main>
+
+<footer>
+  Schachtblick ist ein Produkt von <a href="https://www.mmse-software.com" rel="noopener">MMSE Software Engineering</a> ·
+  <a href="https://www.mmse-software.com/impressum.html" rel="noopener">Impressum</a> ·
+  <a href="./#/datenschutz">Datenschutz</a> · <a href="./#/agb">Nutzungsbedingungen</a> ·
+  <a href="mailto:info@schachtblick.mmse-software.com">info@schachtblick.mmse-software.com</a>
+</footer>
+</body>
+</html>

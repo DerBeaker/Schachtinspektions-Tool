@@ -1,7 +1,7 @@
 # Schachtblick auf IONOS installieren (Testbetrieb)
 
 Diese Anleitung bringt Schachtblick mit Team-Server auf einen IONOS-Webspace – zum Beispiel unter
-`https://app.mmse-software.com`. Zeitbedarf: etwa 30 Minuten. Die Menüpunkte im IONOS-Kundenbereich
+`https://schachtblick.mmse-software.com`. Zeitbedarf: etwa 30 Minuten. Die Menüpunkte im IONOS-Kundenbereich
 heißen sinngemäß wie unten angegeben; IONOS ändert die Oberfläche gelegentlich.
 
 ## Was Sie brauchen
@@ -13,7 +13,7 @@ heißen sinngemäß wie unten angegeben; IONOS ändert die Oberfläche gelegentl
 
 ## 1. Subdomain und SSL
 
-1. IONOS-Kundenbereich → **Domains & SSL** → Ihre Domain → **Subdomain anlegen**, z. B. `app`.
+1. IONOS-Kundenbereich → **Domains & SSL** → Ihre Domain → **Subdomain anlegen**, z. B. `schachtblick`.
 2. Als Ziel **Webspace** wählen und ein neues Verzeichnis angeben: `/schachtblick`.
 3. Für die Subdomain ein **SSL-Zertifikat** aktivieren bzw. zuweisen und „HTTPS“ als Standard nutzen.
 
@@ -31,7 +31,7 @@ heißen sinngemäß wie unten angegeben; IONOS ändert die Oberfläche gelegentl
 
 ## 4. E-Mail-Postfach für den Versand (Einladungen, „Passwort vergessen“)
 
-1. IONOS-Kundenbereich → **E-Mail** → ein Postfach anlegen, z. B. `noreply@mmse-software.com`,
+1. IONOS-Kundenbereich → **E-Mail** → ein Postfach anlegen, z. B. `noreply@schachtblick.mmse-software.com`,
    und das Passwort notieren.
 2. In `config.php` (Schritt 6) den Block **`smtp`** eintragen – das ist bei IONOS der zuverlässige Weg:
 
@@ -39,10 +39,10 @@ heißen sinngemäß wie unten angegeben; IONOS ändert die Oberfläche gelegentl
    'smtp' => [
        'host' => 'smtp.ionos.de',
        'port' => 465,
-       'user' => 'noreply@mmse-software.com',
+       'user' => 'noreply@schachtblick.mmse-software.com',
        'pass' => 'POSTFACH-PASSWORT',
    ],
-   'mail_from' => 'noreply@mmse-software.com',   // gleiche Adresse wie das Postfach
+   'mail_from' => 'noreply@schachtblick.mmse-software.com',   // gleiche Adresse wie das Postfach
    ```
 
 3. Nach der Einrichtung im **Betreiber-Bereich → „E-Mail-Versand testen“** prüfen. Klappt es nicht, steht
@@ -70,9 +70,9 @@ Im Ordner `api/` die Datei `config.sample.php` als **`config.php`** kopieren und
 'db_user' => 'dbu1234567',
 'db_pass' => 'IHR-DATENBANK-PASSWORT',
 'photo_dir' => __DIR__ . '/data/photos',          // durch .htaccess geschützt
-'app_url' => 'https://app.mmse-software.com/',      // Adresse für Links in E-Mails
-'mail_from' => 'noreply@mmse-software.com',
-'smtp' => ['host' => 'smtp.ionos.de', 'port' => 465, 'user' => 'noreply@mmse-software.com', 'pass' => 'POSTFACH-PASSWORT'],
+'app_url' => 'https://schachtblick.mmse-software.com/',      // Adresse für Links in E-Mails
+'mail_from' => 'noreply@schachtblick.mmse-software.com',
+'smtp' => ['host' => 'smtp.ionos.de', 'port' => 465, 'user' => 'noreply@schachtblick.mmse-software.com', 'pass' => 'POSTFACH-PASSWORT'],
 ```
 
 `config.php` niemals weitergeben – sie enthält das Datenbank-Passwort. Der KI-Assistent bleibt
@@ -80,14 +80,14 @@ ausgeschaltet, solange `anthropic_api_key` leer ist.
 
 ## 7. Einrichten
 
-1. `https://app.mmse-software.com/api/setup.php` öffnen.
+1. `https://schachtblick.mmse-software.com/api/setup.php` öffnen.
 2. **Firma:** `MMSE Software Engineering`, Ihr Name, **E-Mail-Adresse** und ein Passwort (mind. 10 Zeichen).
 3. „Einrichten“ – die Tabellen werden angelegt, Sie sind **Betreiber** der Installation.
    Die Seite sperrt sich danach selbst.
 
 ## 8. Erster Test
 
-1. `https://app.mmse-software.com` öffnen → **Einstellungen** → Firmenkonto: mit E-Mail und Passwort
+1. `https://schachtblick.mmse-software.com` öffnen → **Einstellungen** → Firmenkonto: mit E-Mail und Passwort
    anmelden. Das Feld „Server-Adresse“ (unter „Erweitert“) bleibt leer – die App findet den Server
    automatisch unter `…/api/`. Die Datenbank-Zugangsdaten stehen nur in `api/config.php`.
 2. **Betreiber-Bereich** → **Firma anlegen**: z. B. eine Testfirma mit „Test 30 Tage“, max. 3 Benutzer
@@ -99,6 +99,28 @@ ausgeschaltet, solange `anthropic_api_key` leer ist.
    installierte App und funktioniert auch offline.
 6. Stammdaten importieren, einen Schacht aufnehmen, abschließen und auf dem PC (im selben Firmenkonto
    angemeldet) prüfen, ob alles ankommt; Export und PDF-Protokoll testen.
+
+## Bei Google gefunden werden und den Link teilen
+
+Die App bringt alles mit, was Suchmaschinen und Messenger brauchen: Titel und Beschreibung, eine Info-Seite
+mit echtem Text (`/schachtinspektion.html`: „Schachtinspektion per App – kostenlos“), ein Vorschaubild für
+WhatsApp & Co. (`og-bild.jpg`), `robots.txt` und `sitemap.xml`. Die Adresse
+`https://schachtblick.mmse-software.com` steht fest in `index.html`, `schachtinspektion.html`, `robots.txt`,
+`sitemap.xml` und `js/brand.js` (`APP_URL`) – bei einer anderen Adresse dort ändern.
+
+Damit Google die Seite findet (dauert erfahrungsgemäß einige Tage bis Wochen):
+1. [Google Search Console](https://search.google.com/search-console) → Property hinzufügen → **Domain**
+   `schachtblick.mmse-software.com`. Google zeigt einen TXT-Eintrag; diesen im IONOS-Kundenbereich unter
+   **Domains & SSL → mmse-software.com → DNS** als TXT-Eintrag für `schachtblick` anlegen, dann bestätigen.
+2. In der Search Console unter **Sitemaps** `https://schachtblick.mmse-software.com/sitemap.xml` einreichen
+   und unter **URL-Prüfung** die Startseite und die Info-Seite „Indexierung beantragen“.
+3. Am meisten hilft ein Link von Ihrer Website www.mmse-software.com (Produktseite „Schachtblick“) und
+   Erwähnungen in Fachkreisen (LinkedIn, Branchenforen, Kunden).
+
+**Per WhatsApp teilen:** einfach `https://schachtblick.mmse-software.com` schicken – WhatsApp zeigt Bild, Titel
+und Beschreibung. In der App gibt es dafür „Weiterempfehlen“ (Startseite unten, Einstellungen → Über).
+WhatsApp merkt sich die Vorschau eine Weile; wer den Link vor dem Hochladen der neuen Version schon geteilt
+hat, sieht eventuell noch die alte Vorschau. Die Bilder neu erzeugen: `node tools/make-bilder.mjs`.
 
 ## Updates einspielen
 
@@ -161,7 +183,7 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
    der Hinweis auf die Steuerbefreiung nach § 19 UStG stehen.
 4. Optional in `config.php`: `'betreiber_email' => 'info@…'` für Benachrichtigungen (sonst die E-Mail
    des Betreiber-Kontos).
-5. Freigabe einschalten. Danach auf der Website auf `https://app.mmse-software.com/#/pro` verlinken.
+5. Freigabe einschalten. Danach auf der Website auf `https://schachtblick.mmse-software.com/#/pro` verlinken.
 
 Weiterhin gilt:
 - **Kein Cookie-Banner nötig:** keine Cookies, kein Tracking; gespeichert wird nur, was für den Betrieb

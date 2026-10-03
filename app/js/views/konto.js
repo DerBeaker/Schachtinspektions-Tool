@@ -7,7 +7,7 @@ import { navigate, topbar } from '../core/shell.js';
 import { getSettings, saveSettings } from '../core/store.js';
 import { sync } from '../sync.js';
 import { fmtDate } from '../core/util.js';
-import { APP_NAME, VENDOR, VENDOR_EMAIL, SPENDEN_URL } from '../brand.js';
+import { APP_NAME, VENDOR, VENDOR_EMAIL, SPENDEN_URL, APP_URL } from '../brand.js';
 import { VERTRAEGE, VERTRAG_VERSION } from '../data/vertraege.js';
 import { rechtsLinks } from './rechtliches.js';
 
@@ -31,6 +31,18 @@ export function planText(l) {
 /** Freiwillige Unterstützung (PayPal) – öffnet sich in einem neuen Fenster. */
 export function spendenLink(text = `${APP_NAME} unterstützen`) {
   return h('a', { class: 'spenden small', href: SPENDEN_URL, target: '_blank', rel: 'noopener' }, icon('heart', 16), h('span', text));
+}
+
+/** App weiterempfehlen: Teilen-Menü des Geräts (z. B. WhatsApp), sonst Link kopieren. */
+export async function weiterempfehlen() {
+  const text = `${APP_NAME} – kostenlose App für die Schachtinspektion nach ISYBAU und DWA-M 149-2. Läuft im Browser, ohne Installation:`;
+  try {
+    if (navigator.share) { await navigator.share({ title: APP_NAME, text, url: APP_URL }); return; }
+    await navigator.clipboard.writeText(`${text} ${APP_URL}`);
+    toast('Link kopiert – z. B. in WhatsApp einfügen.', 'ok', 4000);
+  } catch (e) {
+    if (e?.name !== 'AbortError') toast(`Link: ${APP_URL}`, 'info', 8000);
+  }
 }
 
 /** Kontrollkästchen mit Text; Links im Text bleiben klickbar. */

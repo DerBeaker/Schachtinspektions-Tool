@@ -9,12 +9,15 @@ import { formatLabel } from '../isybau/export.js';
 import { APP_NAME, VENDOR, VENDOR_URL, VENDOR_WEB } from '../brand.js';
 import { rechtsLinks } from './rechtliches.js';
 import { sync } from '../sync.js';
-import { planText, spendenLink } from './konto.js';
+import { planText, spendenLink, weiterempfehlen } from './konto.js';
 
 const vendorLine = () => h('footer', { class: 'vendor-line muted small' },
   h('div', null, `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB), ' · ', rechtsLinks()),
   h('div', { class: 'row center wrap', style: { marginTop: '8px', gap: '14px' } },
-    sync.auth ? null : h('a', { href: '#/pro' }, `${APP_NAME} Basis (kostenlos) · Pro ansehen`), spendenLink('Unterstützen')));
+    h('a', { href: './schachtinspektion.html' }, `Was ist ${APP_NAME}?`),
+    sync.auth ? null : h('a', { href: '#/pro' }, `${APP_NAME} Basis (kostenlos) · Pro ansehen`),
+    h('a', { href: '#/', onclick: (e) => { e.preventDefault(); weiterempfehlen(); } }, 'Weiterempfehlen'),
+    spendenLink('Unterstützen')));
 
 /** Hinweise zum Tarif: Basis (ohne Konto), Testzeitraum, abgelaufene Lizenz, offene Verträge. */
 function tarifHinweis() {

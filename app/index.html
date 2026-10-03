@@ -3,9 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Schachtblick</title>
-  <meta name="description" content="Schachtinspektion nach ISYBAU und DWA-M 149-2 – Foto von oben, Kodierung, ISYBAU-XML-Export. Läuft im Browser, ohne Installation. Von MMSE Software Engineering.">
+  <title>Schachtblick – Schachtinspektion per App, kostenlos</title>
+  <meta name="description" content="Kostenlose App für die Schachtinspektion nach ISYBAU und DWA-M 149-2: Schacht von oben fotografieren, Anschlüsse und Schäden kodieren, Zustandsklasse, PDF-Schachtprotokoll und Aufmaß. Im Browser, ohne Installation, auch offline.">
   <meta name="author" content="MMSE Software Engineering, www.mmse-software.com">
+  <link rel="canonical" href="https://schachtblick.mmse-software.com/">
+  <!-- Link-Vorschau (WhatsApp, Messenger, soziale Netzwerke); Bild: tools/make-bilder.mjs -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:site_name" content="Schachtblick">
+  <meta property="og:title" content="Schachtblick – Schachtinspektion per App, kostenlos">
+  <meta property="og:description" content="Schacht fotografieren, Anschlüsse und Schäden kodieren, Zustandsklasse und PDF-Protokoll – nach ISYBAU und DWA-M 149-2. Im Browser, ohne Installation.">
+  <meta property="og:url" content="https://schachtblick.mmse-software.com/">
+  <meta property="og:image" content="https://schachtblick.mmse-software.com/og-bild.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Schachtblick: App-Ansicht eines Schachts mit Uhr und Anschlüssen">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Schachtblick",
+    "url": "https://schachtblick.mmse-software.com/",
+    "description": "Web-App für die Inspektion von Abwasserschächten nach ISYBAU (BFR Abwasser) und DWA-M 149-2: Foto von oben, Kodierung, Zustandsklassen, PDF-Schachtprotokoll, Aufmaß, Export als ISYBAU-XML und DWA-M 150.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web-Browser (Android, iOS, Windows, macOS)",
+    "inLanguage": "de",
+    "image": "https://schachtblick.mmse-software.com/og-bild.jpg",
+    "offers": [
+      { "@type": "Offer", "name": "Schachtblick Basis", "price": "0", "priceCurrency": "EUR" },
+      { "@type": "Offer", "name": "Schachtblick Pro (je Monat)", "price": "25", "priceCurrency": "EUR" }
+    ],
+    "publisher": { "@type": "Organization", "name": "MMSE Software Engineering", "url": "https://www.mmse-software.com" }
+  }
+  </script>
   <meta name="theme-color" content="#0a5bd3">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,7 +51,7 @@
   <div id="app">
     <div id="sb-start" style="display:grid;place-items:center;min-height:100vh;color:#5b6b80;font:16px system-ui;text-align:center">Schachtblick wird geladen …<br><small>MMSE Software Engineering · www.mmse-software.com</small></div>
   </div>
-  <noscript>Bitte JavaScript aktivieren – Schachtblick ist eine Web-App.</noscript>
+  <noscript>Bitte JavaScript aktivieren – Schachtblick ist eine Web-App. <a href="schachtinspektion.html">Was ist Schachtblick? Kostenlose App für die Schachtinspektion nach ISYBAU und DWA-M 149-2</a></noscript>
   <script>
     // Startprüfung: Startet die App nicht (z. B. weil nach einem Update noch alte Dateien im Browser
     // liegen), erscheint ein Knopf, der den Zwischenspeicher leert und neu lädt.
