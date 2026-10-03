@@ -1,6 +1,7 @@
 // Export von Schachtinspektionen als ISYBAU-Zustandsdaten (XML-2006, -2013, -2017, -2024).
 
 import { XmlWriter, esc, encodeLatin1 } from './xml.js';
+import { fotoBenenner, FOTO_STANDARD } from './dateinamen.js';
 import { buildRecords, KZUSTAND_ORDER } from './model.js';
 import { bewerteInspektion, ZIELE } from './bewertung.js';
 
@@ -52,20 +53,6 @@ export const EXPORT_FORMATS = [
 export const formatLabel = (f) => (EXPORT_FORMATS.find(([k]) => k === f) || [, f])[1];
 
 const ordered = (rec, order) => order.filter((k) => rec[k] != null && rec[k] !== '').map((k) => [k, rec[k]]);
-
-/** Vergibt Fotodateinamen nach BFR-Konvention: <Objekt>-<lfd. Nr. 3-stellig>.jpg */
-export function photoNamer(objekt) {
-  const map = new Map();
-  const safe = String(objekt).replace(/[\\/:*?"<>|\s]+/g, '_');
-  return {
-    name(photoId) {
-      if (!photoId) return null;
-      if (!map.has(photoId)) map.set(photoId, `${safe}-${String(map.size + 1).padStart(3, '0')}.jpg`);
-      return map.get(photoId);
-    },
-    entries: () => [...map.entries()].map(([id, file]) => ({ id, file })),
-  };
-}
 
 /**
  * @param {object} p
@@ -142,7 +129,7 @@ function stammAnlagen(items, version) {
  * Bauteilbeschreibung der Schächte (Abdeckung, Auflageringe, Aufbau/Konus, Unterteil, Gerinne,
  * Steighilfen) dazu – das verlangen manche Auftraggeber zusätzlich zur Inspektion.
  */
-export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date(), bewertung = true, stammdaten = true }) {
+export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date(), bewertung = true, stammdaten = true, fotoMuster = FOTO_STANDARD }) {
   const profile = ISYBAU_VERSIONS[version];
   if (!profile) throw new Error(`Unbekannte ISYBAU-Version ${version}`);
   const isoDate = (d) => d.toISOString().slice(0, 10);
@@ -153,8 +140,9 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
   const dates = items.map((i) => i.inspection.datum).filter(Boolean).sort();
   const order = KZUSTAND_ORDER.filter((k) => !profile.omit.includes(k));
 
+  const benenner = fotoBenenner({ muster: fotoMuster, project });
   const anlagen = items.map(({ inspection: insp, manhole }) => {
-    const namer = photoNamer(manhole.name);
+    const namer = benenner.fuer(manhole, insp);
     const records = buildRecords(insp, { photoName: namer.name, version });
     const bew = bewertung ? bewerteInspektion(insp, manhole, project) : null;
     if (bew) {

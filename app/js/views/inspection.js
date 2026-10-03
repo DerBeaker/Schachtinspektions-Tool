@@ -4,7 +4,7 @@ import { h, clear, btn, icon, sheet, toast, menu, field, input, numInput, select
 import { navigate, topbar } from '../core/shell.js';
 import {
   getManhole, getProject, openOrCreateInspection, saveInspection, deleteInspection,
-  addPhoto, photoUrl, getPhoto, getSettings, saveManhole,
+  addPhoto, photoUrl, getPhoto, getSettings, saveManhole, listManholes,
 } from '../core/store.js';
 import { CODES, GROUPS, codeLabel, fullCode, FAVORITES, quantDef } from '../data/codes.js';
 import { REF, refLabel } from '../data/reflists.js';
@@ -430,7 +430,9 @@ export async function renderInspection(view, manholeId, params) {
         h('div', { class: 'grid2' },
           field('Datum', input(insp.datum, set('datum'), { type: 'date' })),
           field('Uhrzeit', input(insp.uhrzeit, set('uhrzeit'), { type: 'time' }))),
-        field('Inspekteur', input(insp.inspekteur, set('inspekteur'), { autocomplete: 'name' })),
+        h('div', { class: 'grid2' },
+          field('Inspekteur', input(insp.inspekteur, set('inspekteur'), { autocomplete: 'name' })),
+          field('Berichtnummer', input(insp.berichtNr, set('berichtNr'), { placeholder: 'automatisch' }), 'wird sonst beim Export vergeben')),
         h('div', { class: 'grid2' },
           field('Wetter', select(insp.wetter, REF.U106, set('wetter'))),
           field('Temperatur', h('div', { class: 'input-unit' }, numInput(insp.temperatur, set('temperatur')), h('span', { class: 'unit' }, '°C')))),
@@ -469,6 +471,19 @@ export async function renderInspection(view, manholeId, params) {
             h('dt', 'Baujahr'), h('dd', manhole.baujahr || '–'),
             h('dt', 'Koordinaten'), h('dd', { class: 'mono small' }, manhole.x ? `${fmtNum(manhole.x, 2)} / ${fmtNum(manhole.y, 2)}` : '–'))
             : h('p', { class: 'muted small' }, 'Manuell angelegter Schacht (keine Stammdaten).'),
+          field('Schachtbezeichnung', input(manhole.name, () => {}, { autocapitalize: 'characters', onchange: async (e) => {
+            const neu = e.target.value.trim();
+            if (neu === manhole.name) return;
+            const andere = (await listManholes(manhole.projectId)).filter((m) => m.id !== manhole.id);
+            if (!neu || andere.some((m) => m.name.trim().toLowerCase() === neu.toLowerCase())) {
+              toast(neu ? `„${neu}“ gibt es in diesem Projekt schon – Schachtbezeichnungen müssen eindeutig sein.` : 'Bitte eine Bezeichnung eingeben.', 'error', 5000);
+              e.target.value = manhole.name;
+              return;
+            }
+            manhole.name = neu;
+            await saveManhole(manhole);
+            toast('Bezeichnung geändert.', 'ok');
+          } }), stamm ? 'aus den Stammdaten – nur ändern, wenn sie falsch ist' : null),
           !stamm ? field('Straße', input(manhole.strasse, async (val) => { manhole.strasse = val; await saveManhole(manhole); })) : null),
         bewertungCard())));
   }

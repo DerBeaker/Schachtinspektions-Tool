@@ -9,6 +9,7 @@ import { CODES, codeLabel } from '../data/codes.js';
 import { refLabel } from '../data/reflists.js';
 import { hatBauteile, bauteileZeilen, hoehenbilanz } from '../isybau/bauteile.js';
 import { APP_NAME, CREATED_WITH } from '../brand.js';
+import { fotoBenenner } from '../isybau/dateinamen.js';
 
 const M = 40; // Seitenrand
 const CW = A4.w - 2 * M; // Inhaltsbreite
@@ -115,12 +116,14 @@ function klassenKachel(page, x, y, k, text, { s = 34, size = 8.5 } = {}) {
 }
 
 /** Ein Schacht (beginnt auf neuer Seite). */
-function schacht(L, { project, settings, manhole, inspection: insp, overview, modell, photos = [], optionen }) {
+function schacht(L, { project, settings, manhole, inspection: insp, overview, modell, photos = [], optionen, benenner }) {
   const bt = hatBauteile(insp.bauteile) ? insp.bauteile : hatBauteile(manhole.bauteile) ? manhole.bauteile : null;
   const dn = bt?.aufbau?.laenge || bt?.unterteil?.laenge || manhole.schacht?.dn;
   const werkstoff = bt?.aufbau?.material || bt?.unterteil?.material || manhole.schacht?.material;
+  // mit Fotomuster dieselben Dateinamen wie im Export (Übersichtsfoto = Nr. 001), sonst „Foto 1, 2 …“
+  const namer = benenner?.fuer(manhole, insp);
   const names = new Map();
-  const photoName = (id) => { if (!names.has(id)) names.set(id, `Foto ${names.size + 1}`); return names.get(id); };
+  const photoName = (id, kode) => { if (!names.has(id)) names.set(id, namer ? namer.name(id, kode) : `Foto ${names.size + 1}`); return names.get(id); };
   const recs = buildRecords(insp, { photoName });
   const bew = optionen.klassen ? bewerteInspektion(insp, manhole, project) : null;
   const klById = new Map((bew?.befunde || []).map((e) => [e.id, e]));
@@ -147,6 +150,7 @@ function schacht(L, { project, settings, manhole, inspection: insp, overview, mo
     ['Schacht', [dn ? `DN ${Math.round(dn * 1000)}` : null, werkstoff ? refLabel('G102', werkstoff) : null].filter(Boolean).join(', ') || '–'],
     ['Datum / Uhrzeit', `${fmtDate(insp.datum)} ${insp.uhrzeit || ''}`.trim()],
     ['Inspekteur', insp.inspekteur || '–'],
+    ['Bericht-Nr.', insp.berichtNr || '–'],
     ['Schachttiefe', insp.tiefe != null && insp.tiefe !== '' ? `${fmt(insp.tiefe)} m${insp.tiefeQuelle === 'foto' ? ' (geschätzt)' : ''}` : '–'],
     ['Höhenangaben', vonOben ? 'von oben (Deckel = 0,00 m)' : 'von unten (Sohle = 0,00 m)'],
     ['Wetter / Wasserh.', `${refLabel('U106', insp.wetter) || '–'} / ${refLabel('U107', insp.wasserhaltung) || '–'}`],
@@ -163,7 +167,8 @@ function schacht(L, { project, settings, manhole, inspection: insp, overview, mo
       const w = 230, h = Math.min(230 * overview.height / overview.width, 230);
       const s = Math.min(w / overview.width, h / overview.height);
       L.page.image(overview, M, top, overview.width * s, overview.height * s);
-      L.page.text('Tiefster Auslauf = 12 Uhr (Draufsicht)', M, top + overview.height * s + 3, { size: 6.8, color: GREY });
+      const ovName = namer && insp.overview?.photoId ? names.get(insp.overview.photoId) : null;
+      L.page.text(`Tiefster Auslauf = 12 Uhr (Draufsicht)${ovName ? ' · ' + ovName : ''}`, M, top + overview.height * s + 3, { size: 6.8, color: GREY, maxWidth: 230 });
       fotoH = overview.height * s + 14;
     }
     if (conns.length) {
@@ -341,7 +346,7 @@ function uebersicht(L, { project, entries, optionen }) {
  * @param {object} p.settings   {company, companyAddress, companyContact}
  * @param {Array}  p.entries    [{manhole, inspection, overviewJpeg?, modellJpeg?, photos?: [{id, jpeg, caption}]}]
  * @param {Uint8Array} [p.logoJpeg]
- * @param {object} [p.optionen] {klassen: true, uebersicht: auto}
+ * @param {object} [p.optionen] {klassen: true, uebersicht: auto, fotoMuster | benenner: Dateinamen der Fotos wie im Export}
  * @returns {Uint8Array}
  */
 export function protokollPdf({ project, settings = {}, entries, logoJpeg = null, optionen = {} }) {
@@ -355,12 +360,13 @@ export function protokollPdf({ project, settings = {}, entries, logoJpeg = null,
   });
   const logo = logoJpeg ? doc.addJpeg(logoJpeg) : null;
   const L = new Layout(doc, { header: (page) => kopf(page, { firma, logo }) });
+  const benenner = opt.benenner || (opt.fotoMuster ? fotoBenenner({ muster: opt.fotoMuster, project }) : null);
   if (opt.uebersicht) uebersicht(L, { project, entries, optionen: opt });
   for (const e of entries) {
     const overview = e.overviewJpeg ? doc.addJpeg(e.overviewJpeg) : null;
     const modell = e.modellJpeg ? doc.addJpeg(e.modellJpeg) : null;
     const photos = (e.photos || []).map((f) => ({ ...f, image: f.jpeg ? doc.addJpeg(f.jpeg) : null }));
-    schacht(L, { project, settings, manhole: e.manhole, inspection: e.inspection, overview, modell, photos, optionen: opt });
+    schacht(L, { project, settings, manhole: e.manhole, inspection: e.inspection, overview, modell, photos, optionen: opt, benenner });
   }
   const heute = new Date().toLocaleDateString('de-DE');
   doc.pages.forEach((p, i) => fuss(p, i + 1, doc.pages.length, heute));

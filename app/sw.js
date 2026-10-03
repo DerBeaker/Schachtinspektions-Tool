@@ -1,5 +1,5 @@
 // Service Worker: macht die App offline-fähig (App-Dateien im Cache, API nie cachen).
-const VERSION = 'schachtblick-v14';
+const VERSION = 'schachtblick-v15';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png', './icons/mmse-logo.png',
@@ -7,7 +7,7 @@ const ASSETS = [
   './js/main.js', './js/sync.js', './js/brand.js',
   './js/core/db.js', './js/core/shell.js', './js/core/store.js', './js/core/ui.js', './js/core/util.js',
   './js/data/codes.js', './js/data/reflists.js',
-  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js', './js/isybau/m150.js', './js/isybau/bewertung.js', './js/isybau/vorinspektion.js', './js/isybau/bauteile.js', './js/data/bfr-klassen.js', './js/components/klasse.js', './js/components/modell3d.js', './js/views/karte.js', './js/views/aufbau.js', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './vendor/leaflet/images/layers.png', './vendor/leaflet/images/layers-2x.png',
+  './js/isybau/xml.js', './js/isybau/import.js', './js/isybau/export.js', './js/isybau/model.js', './js/isybau/validate.js', './js/isybau/m150.js', './js/isybau/bewertung.js', './js/isybau/vorinspektion.js', './js/isybau/bauteile.js', './js/isybau/dateinamen.js', './js/data/bfr-klassen.js', './js/components/klasse.js', './js/components/modell3d.js', './js/views/karte.js', './js/views/aufbau.js', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './vendor/leaflet/images/layers.png', './vendor/leaflet/images/layers-2x.png',
   './vendor/three/three.module.min.js', './vendor/three/OrbitControls.js',
   './js/lib/geo.js', './js/lib/zip.js', './js/lib/image.js', './js/lib/depth.js', './js/lib/pdf.js', './js/lib/pdf-fonts.js', './js/lib/xlsx.js',
   './js/report/protokoll.js', './js/report/aufmass.js', './js/report/vertrag.js', './js/data/vertraege.js',

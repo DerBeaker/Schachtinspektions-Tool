@@ -11,6 +11,8 @@ import { aufmassDaten, aufmassPdf, aufmassXlsx, parseStaffel } from '../report/a
 import { codeLabel, fullCode } from '../data/codes.js';
 import { download } from '../core/util.js';
 import { hatBauteile } from '../isybau/bauteile.js';
+import { fotoBenenner, berichtNamen, FOTO_STANDARD, BERICHT_STANDARD } from '../isybau/dateinamen.js';
+import { zipParts, concat } from '../lib/zip.js';
 
 const bytesOf = async (blob) => new Uint8Array(await blob.arrayBuffer());
 
@@ -140,7 +142,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 /**
  * Schachtprotokolle als PDF. items: [{manhole, inspection}]
  */
-export async function protokollErzeugen({ project, items, fotos = true }) {
+/**
+ * Schachtprotokolle: eine PDF für alle Schächte oder (einzeln) je Schacht eine PDF, zusammen als ZIP.
+ * Fotos tragen im Protokoll dieselben Dateinamen wie im XML-Export (Fotomuster des Projekts).
+ */
+export async function protokollErzeugen({ project, items, fotos = true, einzeln = false,
+  berichtMuster = project.berichtMuster || BERICHT_STANDARD, fotoMuster = project.fotoMuster || FOTO_STANDARD }) {
   const settings = await getSettings();
   const t = toast(`PDF wird erstellt … (${items.length} ${items.length === 1 ? 'Schacht' : 'Schächte'})`, 'info', 60000);
   try {
@@ -158,11 +165,21 @@ export async function protokollErzeugen({ project, items, fotos = true }) {
       }
       entries.push({ manhole, inspection, overviewJpeg: await overviewJpeg(inspection).catch(() => null), modellJpeg: await modellJpeg(manhole, inspection), photos });
     }
-    const bytes = protokollPdf({ project, settings, entries, logoJpeg: await logoJpeg(settings) });
-    const name = items.length === 1 ? `Schachtprotokoll_${safe(items[0].manhole.name)}_${today()}.pdf` : `Inspektionsbericht_${safe(project.name)}_${today()}.pdf`;
+    const logo = await logoJpeg(settings);
+    // ein Namensgeber für alle PDFs, damit z. B. {LfdNr} wie im Export durchläuft
+    const optionen = { benenner: fotoBenenner({ muster: fotoMuster, project }) };
+    const namen = berichtNamen(items, { muster: berichtMuster, project });
     t.remove?.();
-    await offerFile(bytes, name, 'application/pdf');
-    toast('PDF erstellt.', 'ok');
+    if (einzeln && entries.length > 1) {
+      const dateien = entries.map((e, i) => ({ name: namen[i], data: protokollPdf({ project, settings, entries: [e], logoJpeg: logo, optionen }) }));
+      await offerFile(concat(zipParts(dateien)), `Schachtprotokolle_${safe(project.name)}_${today()}.zip`, 'application/zip');
+      toast(`${dateien.length} PDF-Dateien als ZIP erstellt.`, 'ok');
+    } else {
+      const bytes = protokollPdf({ project, settings, entries, logoJpeg: logo, optionen });
+      const name = items.length === 1 ? namen[0] : `Inspektionsbericht_${safe(project.name)}_${today()}.pdf`;
+      await offerFile(bytes, name, 'application/pdf');
+      toast('PDF erstellt.', 'ok');
+    }
   } catch (e) {
     console.error(e);
     toast('PDF konnte nicht erstellt werden: ' + e.message, 'error', 6000);

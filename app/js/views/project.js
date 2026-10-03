@@ -106,7 +106,7 @@ export async function renderProject(view, projectId, params) {
         field('Schachttiefe (m)', numInput('', (v) => (d.tiefe = v), { placeholder: 'Deckel bis Sohle, z. B. 2,35', unit: 'm' }))),
       actions: [btn('Anlegen', { variant: 'primary', onClick: async () => {
         if (!d.name.trim()) return toast('Bezeichnung fehlt.', 'error');
-        if (manholes.some((m) => m.name === d.name.trim())) return toast('Diese Bezeichnung gibt es schon.', 'error');
+        if (manholes.some((m) => m.name.trim().toLowerCase() === d.name.trim().toLowerCase())) return toast('Diese Bezeichnung gibt es schon – Schachtbezeichnungen müssen eindeutig sein.', 'error');
         const m = await addManhole(projectId, { name: d.name.trim(), strasse: d.strasse.trim(), tiefe: num(d.tiefe) });
         s.close();
         navigate(`#/s/${m.id}`);

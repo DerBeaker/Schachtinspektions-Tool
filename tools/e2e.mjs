@@ -87,6 +87,12 @@ await sheet.getByPlaceholder('0,0', { exact: true }).fill('0,8');
 await sheet.locator('.clock-picker g[aria-label="3 Uhr"]').click();
 await sheet.getByPlaceholder('0,00').first().fill('0,9');
 await sheet.locator('.shaft .pill', { hasText: 'Schachtaufbau' }).click();
+{
+  // Foto zum Befund – muss in XML (Fotodatei) und ZIP landen
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), sheet.getByRole('button', { name: 'Foto aufnehmen' }).click()]);
+  await fc.setFiles(photo);
+  await sheet.locator('img.thumb').waitFor();
+}
 await shot('08-befund-editor');
 await sheet.getByRole('button', { name: 'Speichern' }).click();
 await page.waitForTimeout(300);
@@ -221,6 +227,8 @@ async function exportAs(format) {
   expect(/<InspektionsKode>DAQ<\/InspektionsKode>[\s\S]*?<Streckenschaden>B<\/Streckenschaden>/, 'DAQ Strecke B fehlt');
   expect(/<Fotodatei>S1005-001\.jpg<\/Fotodatei>/, 'Fotoreferenz fehlt');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
+  expect(/<InspektionsKode>DAB<\/InspektionsKode>(?:(?!<\/KZustand>)[\s\S])*<Fotodatei>S1005-002\.jpg<\/Fotodatei>/, 'Befundfoto (DAB) nicht als Fotodatei S1005-002.jpg in der XML');
+  expect(/Fotos\/S1005-002\.jpg/, 'Befundfoto fehlt im ZIP');
   expect(/<VertikaleLage>1\.92<\/VertikaleLage>\s*<InspektionsKode>DAQ</, 'DAQ-Ende per Laser 500 mm ab Deckel -> 1,92 m');
   expect(/<Stammdatenkollektiv>[\s\S]*<HoeheAuflageringe>12<\/HoeheAuflageringe>[\s\S]*<HoeheAufbau>1\.55<\/HoeheAufbau>[\s\S]*<HoeheUnterteil>0\.60<\/HoeheUnterteil>/, 'Bauteilbeschreibung (Stammdaten) fehlt');
 }
@@ -237,8 +245,23 @@ async function exportAs(format) {
   expect(/<KZ001>1\.52<\/KZ001>\s*<KZ002>DAB<\/KZ002>\s*<KZ014>B<\/KZ014>\s*<KZ015>A<\/KZ015>\s*<KZ003>0\.8<\/KZ003>/, 'DAB (ISYBAU-Schlüssel, Dezimalpunkt) fehlt');
   expect(/<KI101>1<\/KI101>/, 'Höhenangabe von unten (KI101 = 1) fehlt');
   expect(/<KZ005>A1<\/KZ005>/, 'Streckenschaden A1 fehlt');
+  expect(/<KI118>S1005-001\.jpg<\/KI118>/, 'Übersichtsfoto (KI118) fehlt');
+  expect(/<KZ002>DAB<\/KZ002>(?:(?!<\/KZ>)[\s\S])*<KZ009>S1005-002\.jpg<\/KZ009>/, 'Befundfoto (KZ009) beim DAB fehlt');
+  expect(/Fotos\/S1005-002\.jpg/, 'Befundfoto fehlt im ZIP');
   expect(/<KG314>625<\/KG314>[\s\S]*<KG323>2<\/KG323>/, 'Bauteile (Deckel, Steighilfen) in KG fehlen');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
+}
+
+step('Export: eigenes Fotomuster – Foto von oben ist Nr. 001 in XML und ZIP');
+await page.locator('main select').first().selectOption('2017-07');
+await page.getByLabel('Dateinamen der Fotos', { exact: true }).selectOption('{Schacht}_{Datum}_{Nr}');
+await page.getByText(/Beispiel: S1005_\d{8}_001\.jpg \(Foto von oben\)/).waitFor();
+{
+  const z = await exportAs();
+  if (!/<InspektionsKode>DDA<\/InspektionsKode>[\s\S]*?<Fotodatei>S1005_\d{8}_001\.jpg<\/Fotodatei>/.test(z)) errors.push('Fotomuster: Übersichtsfoto (DDA) nicht als S1005_<Datum>_001.jpg in der XML');
+  if (!/<InspektionsKode>DAB<\/InspektionsKode>(?:(?!<\/KZustand>)[\s\S])*<Fotodatei>S1005_\d{8}_002\.jpg<\/Fotodatei>/.test(z) || !/Fotos\/S1005_\d{8}_002\.jpg/.test(z)) errors.push('Fotomuster: Befundfoto nicht als S1005_<Datum>_002.jpg in XML und ZIP');
+  if (!/Fotos\/S1005_\d{8}_001\.jpg/.test(z)) errors.push('Fotomuster: Datei im ZIP heißt nicht wie in der XML');
+  if (/S1005-001\.jpg/.test(z)) errors.push('Fotomuster: alter Standardname noch im Export');
 }
 
 step('Berichte: Schachtprotokolle und Aufmaß');
@@ -252,6 +275,7 @@ await page.locator('main select').first().selectOption('2017-07');
     if (!/Kanal-Service Prüfmann GmbH/.test(t)) errors.push('PDF: Firmenname fehlt');
     if (!/S1005/.test(t) || !/DAB/.test(t)) errors.push('PDF: Schacht/Befund fehlt');
     if (!/www\.mmse-software\.com/.test(t)) errors.push('PDF: Herstellerzeile fehlt');
+    if (!/S1005_\d{8}_002\.jpg/.test(t)) errors.push('PDF: Befundfoto nicht mit dem Exportnamen beschriftet');
   }
   if (!/\/Subtype \/Image/.test(b.toString('latin1'))) errors.push('PDF: Logo/Fotos fehlen');
 }
@@ -271,6 +295,26 @@ await page.getByLabel('Tiefenstaffel (m)').fill('1,5; 2,5');
   } catch { /* unzip fehlt */ }
 }
 await page.screenshot({ path: `${outDir}/12e-berichte.png`, fullPage: true });
+
+step('Berichte: je Schacht eine PDF (ZIP)');
+await page.goBack();
+await page.getByText('S1004', { exact: true }).click();
+await page.getByText('Foto von oben aufnehmen').waitFor();
+await page.goBack();
+await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
+await page.getByRole('button', { name: 'Exportieren' }).waitFor();
+await page.getByLabel('Umfang').selectOption('alle');
+await page.getByRole('radio', { name: 'je Schacht eine PDF' }).click();
+await page.getByText(/Beispiel: Schachtprotokoll_S\d+_\d{8}\.pdf/).waitFor();
+{
+  const p = await fileFrom('Schachtprotokolle (PDF)');
+  try {
+    const liste = execSync(`unzip -Z1 "${p}"`).toString().trim().split('\n');
+    if (liste.length !== 2 || !liste.every((n) => /^Schachtprotokoll_S100[45]_\d{8}\.pdf$/.test(n))) errors.push('Protokolle je Schacht: ' + liste.join(', '));
+  } catch { if (!p.endsWith('.zip')) errors.push('Protokolle je Schacht: keine ZIP-Datei ' + p); }
+}
+await page.getByRole('radio', { name: 'eine PDF für alle' }).click();
+await page.getByLabel('Umfang').selectOption('fertig');
 
 step('Höhenangaben auf „von oben“ umstellen');
 await page.goBack();

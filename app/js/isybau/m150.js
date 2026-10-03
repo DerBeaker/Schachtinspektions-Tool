@@ -7,7 +7,7 @@
 
 import { child, children, text, XmlWriter, encodeLatin1 } from './xml.js';
 import { buildRecords } from './model.js';
-import { photoNamer } from './export.js';
+import { fotoBenenner, FOTO_STANDARD } from './dateinamen.js';
 import { APP_NAME, APP_VERSION, VENDOR, VENDOR_WEB } from '../brand.js';
 import { CODES } from '../data/codes.js';
 import { detectCrs } from '../lib/geo.js';
@@ -388,7 +388,7 @@ function kgFields(manhole, insp, V) {
  * @param {object} p.settings  {company}
  * @returns {{xml:string, bytes:Uint8Array, photos:Array<{id,file}>, count:number}}
  */
-export function exportM150({ project, items, settings = {}, variante = project.m150Variante || 'isybau' }) {
+export function exportM150({ project, items, settings = {}, variante = project.m150Variante || 'isybau', fotoMuster = FOTO_STANDARD }) {
   const V = VARIANTS[variante] || VARIANTS.isybau;
   const photos = [];
   const w = new XmlWriter();
@@ -409,8 +409,9 @@ export function exportM150({ project, items, settings = {}, variante = project.m
     return list;
   };
 
+  const benenner = fotoBenenner({ muster: fotoMuster, project });
   for (const { inspection: insp, manhole } of items) {
-    const namer = photoNamer(manhole.name);
+    const namer = benenner.fuer(manhole, insp);
     const records = buildRecords(insp, { photoName: namer.name });
     const overview = insp.overview?.photoId ? namer.name(insp.overview.photoId) : null;
     const own = namer.entries();

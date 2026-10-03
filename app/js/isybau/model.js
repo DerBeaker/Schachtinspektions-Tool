@@ -102,7 +102,8 @@ function pos(from, to) {
 
 /**
  * Erzeugt die geordnete Liste der KZustand-Datensätze einer Inspektion.
- * photoName(photoId) liefert den Dateinamen für die Fotoreferenz.
+ * photoName(photoId, kode) liefert den Dateinamen für die Fotoreferenz. Das Übersichtsfoto kommt
+ * immer zuerst – es ist das Hauptbild des Schachts (Nr. 001).
  */
 export function buildRecords(insp, { photoName = () => null, version = '2017-07' } = {}) {
   const T = insp.tiefe != null && insp.tiefe !== '' ? Number(insp.tiefe) : null;
@@ -117,7 +118,7 @@ export function buildRecords(insp, { photoName = () => null, version = '2017-07'
   if (insp.overview?.photoId) {
     add(top ?? 0, {
       InspektionsKode: 'DDA',
-      Fotodatei: photoName(insp.overview.photoId),
+      Fotodatei: photoName(insp.overview.photoId, 'DDA'),
       Kommentar: 'Übersichtsfoto von oben, tiefster Auslauf bei 12 Uhr',
     }, 2);
   }
@@ -132,7 +133,7 @@ export function buildRecords(insp, { photoName = () => null, version = '2017-07'
       Charakterisierung2: c.dca === 'A' ? c.dcaC2 || null : null,
       Verbindung: '0', Schachtbereich: bereich, ...p,
       Kommentar: c.kommentar || (c.pipeName ? `${c.dir === 'out' ? 'Ablauf' : 'Zulauf'} ${c.pipeName}` : null),
-      Fotodatei: c.photoId ? photoName(c.photoId) : null,
+      Fotodatei: c.photoId ? photoName(c.photoId, 'DCA') : null,
     };
     const dcg = {
       InspektionsKode: 'DCG', Charakterisierung1: c.form || 'A',
@@ -162,7 +163,7 @@ export function buildRecords(insp, { photoName = () => null, version = '2017-07'
       BezeichnungSanierung: f.sanBez || null,
       DAKZustandSanierung: f.code === 'DAK' && f.c1 === 'Z' ? f.sanZustand || null : null,
       KVerfahrenSanierung: f.code === 'DCB' ? f.sanVerfahren || null : null,
-      Fotodatei: f.photoId ? photoName(f.photoId) : null,
+      Fotodatei: f.photoId ? photoName(f.photoId, f.code) : null,
       Kommentar: f.kommentar || null,
       DDEZulaufDrainage: f.code === 'DDE' && f.drainage ? '1' : null,
       _erfassung: f.source === 'ai' ? '3' : '1',
