@@ -1,7 +1,7 @@
 // Herstellerangaben der App (erscheinen in Einstellungen, Berichten und Exportdateien).
 
 export const APP_NAME = 'Schachtblick';
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.5.0';
 export const VENDOR = 'MMSE Software Engineering';
 export const VENDOR_URL = 'https://www.mmse-software.com';
 export const VENDOR_WEB = 'www.mmse-software.com';

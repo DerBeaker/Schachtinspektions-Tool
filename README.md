@@ -16,6 +16,8 @@ Ein Produkt von **MMSE Software Engineering** – [www.mmse-software.com](https:
 | **Laser-Entfernungsmesser** | Geräte mit Bluetooth-Tastaturmodus (HID) funktionieren auf Android und iPhone: Feld antippen, messen – „2,345 m“ oder „2345 mm“ wird umgerechnet, Enter springt ins nächste Feld |
 | **Plausibilitätsprüfung** | Regeln aus dem Kodierhandbuch (z. B. DAB B erst ab 0,5 mm, „Z“ braucht eine Anmerkung, DAO/DAP nur mit Primärschaden, Pflichtfelder) – live beim Erfassen |
 | **Export** | **ISYBAU-XML 2006, 2013, 2017 oder 2024** (Zustandsdaten, jeweils gegen das **offizielle XSD-Schema geprüft**) oder **DWA-M 150 Typ B** (wahlweise mit ISYBAU-Schlüsseln und Dezimalpunkt wie gängige Kanalsoftware oder wie die DWA-Beispieldatei) – Kodierung nach BFR Abwasser oder DWA-M 149-2, Format pro Projekt wählbar. ZIP mit Fotos nach Namenskonvention (`S1005-001.jpg`) |
+| **Bauteilbeschreibung** | Reiter „Aufbau“ je Schacht: Abdeckung (Form, Klasse, Maße, Material, Lüftung, Schmutzfänger), Auflageringe, Schachtaufbau mit Konus oder Abdeckplatte, untere Schachtzone (Übergangsplatte, Podest), Unterteil mit Gerinne, Steighilfen, Schachtfunktion – genau die Felder der ISYBAU-Stammdaten. Vorbelegung aus den Stammdaten oder per Vorlage „Regelschacht DN 1000“, Höhenbilanz gegen die Schachttiefe, Laser-Eingabe in m/cm. Export als ISYBAU-Stammdaten (alle Versionen, XSD-geprüft) bzw. DWA-M-150-Felder, im PDF-Protokoll als Tabelle |
+| **3D-Modell** | Drehbares, aufgeschnittenes 3D-Modell aus der Bauteilbeschreibung: Unterteil, Ringe, Konus, Auflageringe, Rahmen und Deckel, Berme mit Gerinne, Anschlüsse in Uhrlage und Höhe, Steigeisen. Auch als Bild im Schachtprotokoll |
 | **Zustandsklassen** | Automatische Bewertung nach **BFR Abwasser Anhang A-3** (Stand 01/2025): Einzelschadensklassen je Befund für Dichtheit, Standsicherheit und Betriebssicherheit, Zusatzpunkte aus den Randbedingungen (Entwässerungsart, Wasserschutzzone, Grundwasser, Boden), Objektzahl und **Objektklasse 0–5** je Schacht – live beim Erfassen und im ISYBAU-Export (`Klassifizierung` je Zustand, `Bewertung` je Schacht). Gegen die bewerteten offiziellen ISYBAU-Beispieldaten geprüft: 113 von 113 Schächten identisch |
 | **Vorinspektionen** | Alte Zustandsdaten (ISYBAU-XML 2006–2024 oder DWA-M 150) einlesen – mit oder ohne Stammdaten. Je Schacht wird die letzte Inspektion angezeigt; Befunde und Anschlüsse lassen sich einzeln oder komplett übernehmen |
 | **Karte** | Alle Schächte und Leitungen eines Projekts auf der amtlichen Karte (basemap.de, farbig oder grau) oder OpenStreetMap, eingefärbt nach Status oder Objektklasse; eigener Standort, Navigation zum Schacht |
@@ -24,7 +26,8 @@ Ein Produkt von **MMSE Software Engineering** – [www.mmse-software.com](https:
 | **Protokoll (Druck)** | Druckansicht des Schachtprotokolls im Browser |
 | **Offline** | Läuft ohne Netz weiter (PWA). Alle Daten liegen zuerst auf dem Gerät |
 | **Navigation** | „Schächte in der Nähe“ per GPS und Navigation zum Schacht (UTM- und Gauß-Krüger-Koordinaten werden umgerechnet) |
-| **Team-Server (optional)** | PHP + MySQL auf dem eigenen Webspace: Anmeldung, Synchronisation Handy ↔ PC, Fotos, Benutzerverwaltung, mehrere Firmen (mandantenfähig) |
+| **Team-Server (optional)** | PHP + MySQL auf dem eigenen Webspace: Anmeldung (E-Mail oder Benutzername, „Passwort vergessen“), Synchronisation Handy ↔ PC, Fotos, Benutzerverwaltung mit Einladungen per E-Mail, Firmendaten und Logo zentral für alle Geräte einer Firma |
+| **Mehrere Firmen** | Betreiber-Bereich (MMSE): Firmen anlegen, Administrator per Einladungslink, Lizenz je Firma (Benutzerzahl, Laufzeit, Testzugang), sperren, Daten exportieren oder löschen. Jede Firma sieht nur ihre eigenen Daten |
 | **KI-Assistent (optional)** | Fotoanalyse mit Claude: schlägt Anschlüsse und sichtbare Schäden als Kodes vor – der Inspekteur bestätigt oder verwirft |
 | **Tiefe aus dem Foto (experimentell)** | Schätzung über zwei Kreise bekannter Größe (Schachthals oben, Schacht-DN unten) – nur zur Plausibilitätskontrolle |
 
@@ -43,6 +46,8 @@ Auf dem Handy im gleichen WLAN `http://<IP-des-PCs>:8080` öffnen. **Kamera, GPS
 
 ## Installation auf dem IONOS-Webspace
 
+Schritt für Schritt mit Upload-Paket: **[docs/INSTALLATION-IONOS.md](docs/INSTALLATION-IONOS.md)**. Paket bauen: `npm run paket` → `dist/schachtblick-<version>.zip`.
+
 ### Variante A – nur die App (ohne Server, ohne Login)
 1. Den Inhalt des Ordners `app/` per SFTP/FTP in ein Verzeichnis des Webspace hochladen, z. B. `/schacht/`.
 2. Im IONOS-Kundenbereich ein SSL-Zertifikat für die Domain aktivieren.
@@ -54,8 +59,8 @@ Jedes Gerät speichert dann seine eigenen Daten; Austausch über ISYBAU-Export.
 1. Wie Variante A hochladen (der Ordner `api/` gehört dazu).
 2. Im IONOS-Kundenbereich unter *Hosting → Datenbanken* eine **MySQL/MariaDB-Datenbank** anlegen.
 3. `api/config.sample.php` als `api/config.php` kopieren und die Datenbank-Zugangsdaten eintragen.
-4. `https://deine-domain.de/schacht/api/setup.php` aufrufen → Firma und ersten Administrator anlegen (die Seite sperrt sich danach selbst).
-5. In der App: *Einstellungen → Team-Server* → anmelden. Weitere Benutzer legt der Administrator dort unter „Benutzer verwalten“ an.
+4. `https://deine-domain.de/schacht/api/setup.php` aufrufen → Firma und ersten Administrator anlegen (die Seite sperrt sich danach selbst). Dieser erste Benutzer ist **Betreiber** der Installation.
+5. In der App: *Einstellungen → Team-Server* → anmelden. Weitere Benutzer lädt der Administrator dort unter „Benutzer verwalten“ per E-Mail ein; weitere Firmen legt der Betreiber im **Betreiber-Bereich** an.
 
 Fotos liegen in `api/data/photos` (per `.htaccess` gesperrt). Besser: in `config.php` einen Pfad **außerhalb** des Webordners eintragen (`photo_dir`).
 
@@ -84,8 +89,9 @@ app/                    ← kommt auf den Webspace
   js/isybau/            XML-Parser, Import (Stamm- und Zustandsdaten), ISYBAU-Export (2006–2024), DWA-M 150,
                         Plausibilität, Zustandsbewertung (BFR A-3)
   js/report/, js/lib/   PDF-Schachtprotokoll, Aufmaß (PDF/Excel), eigener PDF- und XLSX-Writer
-  js/views/, components Oberfläche (Foto mit Uhr, Schachtschnitt, Editoren, Karte)
+  js/views/, components Oberfläche (Foto mit Uhr, Schachtschnitt, Editoren, Bauteile/3D, Karte, Betreiber-Bereich)
   vendor/leaflet/       Kartenbibliothek Leaflet 1.9.4 (BSD-2-Clause)
+  vendor/three/         3D-Bibliothek three.js r160 (MIT)
   api/                  optionaler PHP-Server (MySQL oder SQLite)
 docs/KONZEPT.md         Konzept, Grenzen, Roadmap
 tests/                  automatische Tests (Node + PHP)
@@ -101,6 +107,9 @@ npm run serve   # lokaler Server auf Port 8080
 node tools/make-test-photo.mjs /tmp/schacht.jpg
 node tools/e2e.mjs http://127.0.0.1:8080/ /tmp/schacht.jpg /tmp/e2e     # Browser-Test (Playwright)
 node tools/e2e-sync.mjs /tmp/schacht.jpg /tmp/e2e-sync                    # Sync Handy → PC
+node tools/e2e-firmen.mjs /tmp/schacht.jpg /tmp/e2e-firmen                # Betreiber, Einladung, Lizenz, Firmendaten
+SB_TEST_MYSQL="mysql:host=…;dbname=leer|benutzer|passwort" node --test tests/api.test.mjs   # Server-Tests gegen MySQL/MariaDB
+npm run paket   # Upload-Paket für den Webspace
 ```
 
 Keine npm-Abhängigkeiten für die App selbst; die Browser-Tests nutzen ein global installiertes Playwright.
@@ -113,6 +122,8 @@ Keine npm-Abhängigkeiten für die App selbst; die Browser-Tests nutzen ein glob
 - DIN EN 13508-2:2011 / DWA-M 149-2 (Kodiersystem; die Hauptkodes für Schächte sind identisch, ISYBAU legt strengere Regeln fest)
 - BFR Abwasser Anhang A-3 „Zustandsklassifizierung und -bewertung“ (Stand 01/2025), Tabellen A-3-4 und A-3-38 bis A-3-70 für Schächte. Die Bewertung nach DWA-M 149-3 ist nicht enthalten (Tabellen nicht frei verfügbar).
 - Karten: basemap.de Web Raster © BKG (Datenlizenz Deutschland – Namensnennung 2.0), OpenStreetMap © OpenStreetMap-Mitwirkende (ODbL), Leaflet © Volodymyr Agafonkin (BSD-2-Clause)
+- 3D: three.js © three.js authors (MIT)
+- Bauteilbeschreibung: BFR Abwasser Anhang A-7.4 (ISYBAU-Stammdaten Knoten/Schacht) und A-7.9 (Referenzlisten G301–G309); DWA-M 150 KG-Felder 304–325
 
 Die fachliche Verantwortung für die Kodierung liegt beim zertifizierten Inspekteur. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel.
 

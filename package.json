@@ -1,13 +1,14 @@
 {
   "name": "schachtinspektions-tool",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "Schachtblick – Web-App zur Schachtinspektion nach ISYBAU / DWA-M 149-2",
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "xsd": "bash tools/fetch-isybau-xsd.sh",
     "demo": "node tools/make-demo.mjs > app/demo/demo-stammdaten.xml",
-    "serve": "php -S 0.0.0.0:8080 -t app"
+    "serve": "php -S 0.0.0.0:8080 -t app",
+    "paket": "node tools/paket.mjs"
   }
 }

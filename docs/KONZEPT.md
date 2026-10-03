@@ -85,9 +85,29 @@ Zustandsdaten früherer Inspektionen (ISYBAU-XML 2006–2024, DWA-M 150 KG/KI/KZ
 - **Aufmaß** als PDF (mit Unterschriftsfeldern Auftragnehmer/Auftraggeber) und Excel (XLSX): Position, Schacht, Straße, Datum, Tiefe, Tiefenstaffel, Mehrtiefe, Verfahren, Reinigung, Fotos, Befunde, Status; Summen je Staffel. Staffelgrenzen und Grenztiefe für die Mehrtiefe werden je Projekt gespeichert.
 - PDF und XLSX werden mit eigenem, kleinem Code erzeugt (keine Fremdbibliothek, funktioniert offline).
 
-### 4.4 Karte
+### 4.4 Bauteilbeschreibung und 3D-Modell
+
+Viele Auftraggeber verlangen neben dem Zustand eine Beschreibung des Schachtaufbaus. ISYBAU sieht dafür in den **Stammdaten** (Knoten/Schacht) feste Felder vor: Abdeckung (Form, Typ, Länge/Breite, Klasse, Material, Schmutzfänger), Auflageringe (Anzahl, Gesamthöhe in cm), Schachtaufbau (Form, Konus, Abdeckplatte, DN/Länge, Breite, Höhe, Material), untere Schachtzone (nur Sonderschächte: Übergangsplatte, Konus, Podest), Unterteil (Form, Maße, Material, Gerinneform und -material), Steighilfen (Art, Material) und Schachtfunktion. Genau diese Felder erfasst der Reiter „Aufbau“.
+
+- Vorbelegung aus importierten Stammdaten (ISYBAU 2006–2024 bzw. DWA-M 150), alternativ Vorlage „Regelschacht DN 1000“ (Höhen bleiben leer und werden gemessen).
+- Höhenbilanz: Auflageringe + Aufbau + untere Zone + Unterteil gegen die Schachttiefe; der Rest entspricht Abdeckung und Rahmen.
+- Export: Der ISYBAU-Export enthält zusätzlich ein **Stammdatenkollektiv** mit der Bauteilbeschreibung je Schacht (2006/2013: Abdeckung im Schacht-Element, ab 2017: Knoten/Abdeckungen/Deckel; Schachtfunktionen 13–22 nur in 2024) – gegen alle vier XSD geprüft und abschaltbar. DWA-M 150 schreibt die vorhandenen KG-Felder (Schachtform/-maße, Material, Deckel, Gerinne, Steighilfen, Innenschutz) samt Referenztabellen; Konus und Auflageringe kennt M 150 nicht.
+- Das **3D-Modell** wird aus denselben Daten erzeugt (three.js, lokal mitgeliefert, funktioniert offline): aufgeschnittener Schacht mit allen Bauteilen, Berme und Gerinne zum Auslauf bei 12 Uhr, Anschlüssen in Uhrlage und Höhe, Steigeisen. Fehlende Maße werden mit üblichen Werten ergänzt und benannt. Im PDF-Protokoll erscheint es als Bild neben der Bauteiltabelle. Das 3D-Modell selbst wird nicht ausgetauscht – die empfangende Software baut es aus den Stammdaten wieder auf.
+
+### 4.5 Karte
 
 Schächte (Kreise, eingefärbt nach Status oder Objektklasse) und Leitungen eines Projekts auf der Karte; Koordinaten aus den Stammdaten (UTM/Gauß-Krüger → WGS84). Hintergrund: **basemap.de** (amtliche Karte des BKG, farbig oder grau) oder OpenStreetMap. Kartenbibliothek Leaflet liegt in `app/vendor/` (keine externe Einbindung). Die Kartenkacheln brauchen eine Internetverbindung; ohne Netz bleiben Schachtliste und „In der Nähe“ nutzbar.
+
+## 4a. Mehrere Firmen (Betrieb durch MMSE)
+
+- **Eine Installation, viele Firmen:** Jede Firma ist ein Mandant mit eigenen Benutzern, Projekten und Fotos. Jede Datenbankabfrage ist auf den Mandanten beschränkt (automatisch getestet).
+- **Betreiber:** Der Benutzer, der die Installation einrichtet (MMSE), sieht den Betreiber-Bereich: Firmen anlegen, Administrator per Einladungslink, Lizenz je Firma (max. Benutzer, gültig bis, Testzugang 30 Tage), sperren, Daten exportieren (JSON) und löschen. Inhalte der Firmen (Projekte, Inspektionen) sieht der Betreiber in der App nicht.
+- **Firmen-Administrator:** lädt Mitarbeiter per E-Mail ein (Inspekteur oder Administrator), pflegt Firmendaten und Logo – diese gelten automatisch auf allen Geräten der Firma und erscheinen in PDF-Berichten.
+- **Anmeldung:** mit E-Mail-Adresse (oder Benutzername); „Passwort vergessen“ schickt einen Link (2 Stunden gültig). Einladungslinks gelten 14 Tage und einmal.
+- **Lizenz:** abgelaufene oder gesperrte Firmen können sich nicht anmelden und nicht synchronisieren; die Daten auf den Geräten bleiben erhalten. Die Benutzergrenze greift beim Anlegen, Einladen und Entsperren.
+- **Datenbank-Updates** laufen automatisch (Schema-Version in `sb_meta`), bestehende Installationen werden beim ersten Aufruf nach dem Update ergänzt.
+- Getestet mit SQLite und MariaDB 10.11 sowie unter Apache mit den mitgelieferten `.htaccess`-Regeln.
+- Alternative **Weg B** (eigene Installation je Kunde) funktioniert mit demselben Paket.
 
 ## 5. Tiefen automatisch aus dem Foto?
 
@@ -145,11 +165,11 @@ Realistische Erwartung:
 - Auf IONOS installieren, Team-Server einrichten.
 
 **Phase 2 – Ausbau**
-- ✔ Zustandsbewertung nach BFR Abwasser A-3 mit Bewertungsfeldern im Export, ✔ Vorinspektionen, ✔ Karte, ✔ PDF-Berichte mit Logo, ✔ Aufmaß.
+- ✔ Zustandsbewertung nach BFR Abwasser A-3 mit Bewertungsfeldern im Export, ✔ Vorinspektionen, ✔ Karte, ✔ PDF-Berichte mit Logo, ✔ Aufmaß, ✔ Bauteilbeschreibung mit 3D-Modell, ✔ mehrere Firmen mit Betreiber-Bereich und Lizenzen.
 - KI-Analyse der Fotos im Praxistest weiterentwickeln (zurückgestellt).
 - Bewertung nach DWA-M 149-3, sobald die Tabellen lizenziert vorliegen.
 - DWA-M 149-2 in der aktuellen Ausgabe: DWA-spezifische Charakterisierungen ergänzen, die über die BFR-Liste hinausgehen.
-- Firmenlogo und Firmendaten über den Team-Server für alle Geräte verteilen; mehrere Übersichtsfotos (z. B. Schachtkamera/360°).
+- Mehrere Übersichtsfotos (z. B. Schachtkamera/360°); Selbstregistrierung von Firmen und Online-Bezahlung.
 - Auftraggeber-Profile (Pflichtfelder, Bezugspunkte, Fotokonventionen, Aufmaßpositionen mit Preisen).
 
 **Phase 3 – Für andere Firmen**

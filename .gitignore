@@ -6,3 +6,4 @@ app/api/data/*
 app/api/vendor/
 *.log
 .DS_Store
+dist/
