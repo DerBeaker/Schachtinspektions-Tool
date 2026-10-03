@@ -362,6 +362,8 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .map-tools .segmented { background: var(--surface); box-shadow: var(--shadow); }
 .map-tools .btn { background: var(--surface); box-shadow: var(--shadow); }
 .map-legend { position: absolute; left: 10px; bottom: 24px; z-index: 1000; display: flex; gap: 10px; flex-wrap: wrap; padding: 6px 10px; border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); font-size: .8rem; font-weight: 600; }
+.map-hint { position: absolute; left: 10px; right: 10px; bottom: 70px; z-index: 1000; display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-size: .8rem; max-width: 520px; }
+.map-hint[hidden] { display: none; }
 .map-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
 .map-legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid #fff; box-shadow: 0 0 0 1px #0002; }
 .map-view:not(.labels-on) .mh-label { display: none; }

@@ -53,10 +53,21 @@ export async function renderKarte(view, projectId) {
   try { L = await loadLeaflet(); } catch (e) { toast(e.message, 'error'); return; }
   const map = L.map(mapEl, { zoomControl: true, preferCanvas: true });
   let tiles = null;
+  // Hinweis, wenn der Kartenhintergrund nicht geladen werden kann (offline, Firewall oder
+  // eine Umgebung, die fremde Bilder sperrt – z. B. die Demo-Vorschau)
+  const hint = h('div', { class: 'map-hint', hidden: true },
+    icon('wifiOff', 18),
+    h('span', 'Kartenhintergrund kann nicht geladen werden – keine Internetverbindung oder in dieser Umgebung gesperrt (z. B. Demo-Vorschau). Die Schächte werden trotzdem angezeigt.'));
+  mapEl.parentElement.append(hint);
   const setLayer = (k) => {
     if (tiles) map.removeLayer(tiles);
     const [url, attribution, maxZoom] = LAYERS[k];
-    tiles = L.tileLayer(url, { attribution, maxZoom, maxNativeZoom: 18 }).addTo(map);
+    const n = { ok: 0, err: 0 };
+    hint.hidden = true;
+    // OpenStreetMap verlangt einen Referer; die Seite selbst sendet wegen „same-origin“ sonst keinen
+    tiles = L.tileLayer(url, { attribution, maxZoom, maxNativeZoom: 18, referrerPolicy: 'strict-origin-when-cross-origin' }).addTo(map);
+    tiles.on('tileload', () => { n.ok++; hint.hidden = true; });
+    tiles.on('tileerror', () => { n.err++; if (!n.ok && n.err >= 3) hint.hidden = false; });
   };
   setLayer(state.layer);
 
