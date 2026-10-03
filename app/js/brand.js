@@ -20,6 +20,6 @@ export const SPENDEN_URL = 'https://www.paypal.com/paypalme/derbeaker';
 // Anzeige der Preise, solange der Server keine liefert (Demo, offline); maßgeblich sind die
 // Werte im Betreiber-Bereich (Plattform-Einstellungen).
 export const PLATTFORM_STANDARD = {
-  freigegeben: false, testTage: 30, steuer: 'zzgl. gesetzlicher Umsatzsteuer',
+  freigegeben: false, testTage: 30, steuer: 'ohne Umsatzsteuer (Kleinunternehmer nach § 19 UStG)',
   preise: { monat: 25, jahr: 250, inklusive: 3, zusatzMonat: 5, zusatzJahr: 50 },
 };

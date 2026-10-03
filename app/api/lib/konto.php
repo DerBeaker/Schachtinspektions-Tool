@@ -16,7 +16,8 @@ const SB_PLATTFORM_STANDARD = [
     'freigegeben' => false,
     'testTage' => 30,
     'preise' => ['monat' => 25, 'jahr' => 250, 'inklusive' => 3, 'zusatzMonat' => 5, 'zusatzJahr' => 50],
-    'steuer' => 'zzgl. gesetzlicher Umsatzsteuer',
+    // Kleinunternehmer; nach Überschreiten der Grenze im Betreiber-Bereich auf „zzgl. gesetzlicher Umsatzsteuer“ ändern
+    'steuer' => 'ohne Umsatzsteuer (Kleinunternehmer nach § 19 UStG)',
 ];
 
 /** Plattform-Einstellungen (Standardwerte, überschrieben durch den Betreiber-Bereich). */
@@ -443,7 +444,7 @@ function handle_konto_buchen(array $u): never
     foreach ($an as $to) {
         sb_mail($to, $aenderung ? 'Schachtblick Pro – Änderung bestätigt' : 'Schachtblick Pro – Bestellbestätigung', "Guten Tag,\n\n"
             . ($aenderung ? "die Änderung Ihres Abos für „{$u['tenant']}“ ist eingegangen und sofort wirksam.\n\n" : "vielen Dank für Ihre Bestellung. Schachtblick Pro ist für „{$u['tenant']}“ freigeschaltet.\n\n")
-            . $details . "\nDie Rechnung erhalten Sie per E-Mail; sie ist jeweils im Voraus für den Abrechnungszeitraum fällig (14 Tage netto). "
+            . $details . "\nDie Rechnung erhalten Sie per E-Mail; sie ist jeweils im Voraus für den Abrechnungszeitraum fällig (zahlbar innerhalb von 14 Tagen). "
             . "Kündigen können Sie $kuendigung – in der App unter Einstellungen → Abo & Verträge oder per E-Mail.\n\n"
             . "Bestellt von: {$u['name']}\n" . sb_vertragstext_links() . "\nSchachtblick – " . SB_VENDOR . "\n");
     }

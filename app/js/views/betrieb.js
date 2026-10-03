@@ -56,7 +56,7 @@ export async function renderBetrieb(view) {
       kachel(`${aktiv.length} / ${tenants.length}`, `Firmen aktiv (${tenants.filter((t) => t.plan === 'test' && !t.expired).length} im Test)`),
       kachel(String(tenants.reduce((s, t) => s + t.activeUsers, 0)), 'aktive Benutzer'),
       kachel(`${mb(tenants.reduce((s, t) => s + t.photoBytes, 0))} MB`, `Fotos (${tenants.reduce((s, t) => s + t.photos, 0)})`),
-      kachel(euro(umsatz), `je Monat aus ${zahlend.length} Abo(s), netto`));
+      kachel(euro(umsatz), `je Monat aus ${zahlend.length} Abo(s)`));
     clear(listEl, tenants.map((t) => {
       const status = !t.active ? badge('gesperrt', 'err') : t.expired ? badge(t.plan === 'test' ? 'Test abgelaufen' : 'Lizenz abgelaufen', 'err')
         : t.validUntil && t.validUntil < inTagen(31) ? badge(`${t.plan === 'test' ? 'Test bis' : 'läuft ab'} ${fmtDate(t.validUntil)}`, 'warn') : badge(t.own ? 'Betreiber' : 'aktiv', 'ok');
@@ -166,13 +166,13 @@ export async function renderBetrieb(view) {
           h('a', { href: '#/agb' }, 'Nutzungsbedingungen'), ' · ', h('a', { href: '#/avv' }, 'AVV'), ' · ', h('a', { href: '#/datenschutz' }, 'Datenschutzhinweise'), '.'),
         field('Testzeitraum (Tage)', input(String(p.testTage), (v) => { p.testTage = parseInt(v, 10) || 30; }, { type: 'number', min: 1, max: 365 })),
         h('div', { class: 'grid2' },
-          field('Preis je Monat (€, netto)', zahl('monat')),
-          field('Preis je Jahr (€, netto)', zahl('jahr'))),
+          field('Preis je Monat (€)', zahl('monat')),
+          field('Preis je Jahr (€)', zahl('jahr'))),
         h('div', { class: 'grid3' },
           field('Benutzer inklusive', zahl('inklusive')),
           field('je weiterer Benutzer / Monat', zahl('zusatzMonat')),
           field('je weiterer Benutzer / Jahr', zahl('zusatzJahr'))),
-        field('Hinweis zur Umsatzsteuer', input(p.steuer, (v) => { p.steuer = v; }), 'z. B. „zzgl. gesetzlicher Umsatzsteuer“ oder als Kleinunternehmer „keine Umsatzsteuer nach § 19 UStG“.'),
+        field('Hinweis zur Umsatzsteuer', input(p.steuer, (v) => { p.steuer = v; }), 'Steht hinter jedem Preis. Als Kleinunternehmer „ohne Umsatzsteuer (Kleinunternehmer nach § 19 UStG)“; nach Überschreiten der Grenze „zzgl. gesetzlicher Umsatzsteuer“.'),
         h('p', { class: 'muted small' }, 'Preisänderungen gelten für neue Buchungen. Laufende Abos behalten ihren Preis, bis Sie den Kunden informieren (Nutzungsbedingungen § 4: sechs Wochen vorher).')),
       actions: [btn('Speichern', { variant: 'primary', onClick: async () => {
         try { const r = await sync.opPlattform(p); plattform = r.plattform; s.close(); toast('Gespeichert.', 'ok'); load(); } catch (e) { toast(e.message, 'error', 5000); }

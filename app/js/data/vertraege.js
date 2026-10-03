@@ -36,7 +36,7 @@ export const AGB = {
       '(4) Der Kunde hält die Zugangsdaten geheim und ist für die Benutzer verantwortlich, die er einlädt oder anlegt.',
     ] },
     { titel: '§ 4 Preise und Zahlung', absaetze: [
-      '(1) Es gelten die bei der Buchung in der App angezeigten Preise je Firmenkonto zuzüglich der gesetzlichen Umsatzsteuer, soweit diese anfällt. Enthalten ist die bei der Buchung gewählte Zahl von Benutzern.',
+      '(1) Es gelten die bei der Buchung in der App angezeigten Preise je Firmenkonto. Enthalten ist die bei der Buchung gewählte Zahl von Benutzern. Solange der Anbieter Kleinunternehmer nach § 19 UStG ist, wird keine Umsatzsteuer berechnet; fällt künftig Umsatzsteuer an, wird sie zusätzlich in der gesetzlichen Höhe berechnet.',
       '(2) Die Vergütung ist für den jeweiligen Abrechnungszeitraum (Monat oder Jahr) im Voraus zu zahlen. Der Anbieter stellt die Rechnung per E-Mail; sie ist innerhalb von 14 Tagen ohne Abzug fällig. Wird während des Testzeitraums gebucht, beginnt die Abrechnung erst nach dessen Ende.',
       '(3) Ist der Kunde mit der Zahlung mehr als 30 Tage im Verzug, darf der Anbieter den Zugang nach vorheriger Ankündigung in Textform sperren, bis die offenen Beträge bezahlt sind.',
       '(4) Preisänderungen teilt der Anbieter mindestens sechs Wochen vor ihrem Wirksamwerden in Textform mit. Der Kunde kann den Vertrag dann zum Zeitpunkt des Wirksamwerdens kündigen.',

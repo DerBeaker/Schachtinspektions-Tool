@@ -156,7 +156,9 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
 2. Zusagen im AVV einhalten oder anpassen: **mindestens wöchentliche Sicherung** von Datenbank und Fotos,
    Sicherungen höchstens 90 Tage aufbewahren (Anlage 2); Rechenzentrum in Deutschland (IONOS-Vertrag
    prüfen, Anlage 3); Meldung von Datenschutzverletzungen innerhalb von 48 Stunden.
-3. Preise und Umsatzsteuer-Hinweis einstellen (Kleinunternehmer: „keine Umsatzsteuer nach § 19 UStG“).
+3. Preise prüfen. Voreingestellt ist „ohne Umsatzsteuer (Kleinunternehmer nach § 19 UStG)“; wer die Grenze
+   überschreitet, stellt auf „zzgl. gesetzlicher Umsatzsteuer“ um. Auf Ihren Rechnungen muss als Kleinunternehmer
+   der Hinweis auf die Steuerbefreiung nach § 19 UStG stehen.
 4. Optional in `config.php`: `'betreiber_email' => 'info@…'` für Benachrichtigungen (sonst die E-Mail
    des Betreiber-Kontos).
 5. Freigabe einschalten. Danach auf der Website auf `https://app.mmse-software.com/#/pro` verlinken.

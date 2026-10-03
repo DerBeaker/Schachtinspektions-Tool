@@ -41,6 +41,7 @@ test('Nutzungsbedingungen: nur Unternehmer, Basis ohne XML-Export, Kündigung', 
   assert.match(t, /XML-Format \(ISYBAU, DWA-M 150\) ist in Schachtblick Basis nicht enthalten/);
   assert.match(t, /jederzeit zum Ende des laufenden Abrechnungsmonats/);
   assert.match(t, /Testzeitraums gebucht, beginnt die Abrechnung erst nach dessen Ende/);
+  assert.match(t, /Kleinunternehmer nach § 19 UStG ist, wird keine Umsatzsteuer berechnet/);
 });
 
 test('AVV als PDF mit Vertragsparteien und Annahmenachweis', () => {

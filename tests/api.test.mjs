@@ -339,7 +339,7 @@ test('Tarife: Registrierung mit AGB/AVV, Buchung, Kündigung, Betreiber', { skip
   assert.equal(r.status, 200);
   assert.deepEqual([r.data.lizenz.plan, r.data.lizenz.validUntil, r.data.lizenz.maxUsers, r.data.abo.preis], ['pro', null, 4, 30]);
   assert.equal((Date.parse(r.data.abo.seit) - Date.parse(l.validUntil)) / tag, 1);
-  assert.match(mails(), /Bestellbestätigung[\s\S]*30,00 € je Monat zzgl\. gesetzlicher Umsatzsteuer/);
+  assert.match(mails(), /Bestellbestätigung[\s\S]*30,00 € je Monat ohne Umsatzsteuer \(Kleinunternehmer nach § 19 UStG\)/);
   // Kündigung noch im Test: endet mit dem Testzeitraum, es entstehen keine Kosten
   r = await api('konto-kuendigen', { method: 'POST', token: paula });
   assert.deepEqual([r.data.lizenz.validUntil, r.data.abo.endet], [l.validUntil, l.validUntil]);
