@@ -1,7 +1,7 @@
 // Gerinne im 3D-Modell: Verlauf vom Hauptzulauf zum Auslauf (gerade oder im Bogen), Wahl des Hauptzulaufs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gerinneVerlauf, gerinneAnschluesse } from '../app/js/components/modell3d.js';
+import { gerinneVerlauf, gerinneAnschluesse, nebenGerinneVerlauf, nebenGerinne, bermeUmrisse } from '../app/js/components/modell3d.js';
 
 const r = 0.5, w = 0.15;
 const nah = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -52,4 +52,50 @@ test('Hauptzulauf: der tiefste, bei gleicher Höhe der größte; ohne Zulauf ger
   assert.equal(gerinneAnschluesse([aus], 2).uhrZu, 6, 'ohne Zulauf: gegenüber dem Auslauf');
   assert.equal(gerinneAnschluesse([aus, { dir: 'in', clock: 12, dn: 200 }], 2).uhrZu, 6, 'Zulauf auf Höhe des Auslaufs: gerade');
   assert.equal(gerinneAnschluesse([aus, { dir: 'closed', clock: 4, dn: 200 }], 2).uhrZu, 6, 'verschlossene Anschlüsse zählen nicht');
+});
+
+const flaeche = (loop) => Math.abs(loop.reduce((a, [x, z], i) => { const [x2, z2] = loop[(i + 1) % loop.length]; return a + x * z2 - x2 * z; }, 0) / 2);
+
+test('Berme: Kreis ohne Hauptgerinne = zwei Flächen mit passender Größe', () => {
+  const v = gerinneVerlauf({ uhrZu: 6, uhrAus: 0, rInnen: r, w });
+  const umrisse = bermeUmrisse({ rInnen: r, kanaele: [{ achse: v.achse, w }] });
+  assert.equal(umrisse.length, 2);
+  const soll = Math.PI * r * r - (2 * w * Math.sqrt(r * r - w * w) + 2 * r * r * Math.asin(w / r)); // Kreis minus Streifen
+  const ist = umrisse.reduce((a, l) => a + flaeche(l), 0);
+  assert.ok(Math.abs(ist - soll) / soll < 0.02, `Fläche ${ist.toFixed(4)} statt ${soll.toFixed(4)}`);
+  assert.ok(umrisse.flat().every(([x, z]) => Math.hypot(x, z) <= r + 0.01));
+});
+
+test('Nebengerinne von 9 Uhr mündet in Fließrichtung ins Hauptgerinne und teilt die Berme', () => {
+  const haupt = gerinneVerlauf({ uhrZu: 6, uhrAus: 0, rInnen: r, w });
+  const n = nebenGerinneVerlauf({ uhr: 9, rInnen: r, haupt });
+  assert.ok(nah(n.achse[0][0], -r) && nah(n.achse[0][1], 0, 1e-9), 'beginnt an der Wand bei 9 Uhr');
+  const [jx, jz] = n.achse.at(-1);
+  assert.deepEqual([jx, jz], haupt.achse[n.muendung], 'endet auf der Achse des Hauptgerinnes');
+  const [tx, tz] = n.tangenten.at(-1);
+  const [hx, hz] = haupt.tangenten[n.muendung];
+  assert.ok(tx * hx + tz * hz > 0.99, 'läuft tangential in Fließrichtung ein');
+  const umrisse = bermeUmrisse({ rInnen: r, kanaele: [{ achse: haupt.achse, w }, { achse: n.achse, w: 0.075 }] });
+  assert.equal(umrisse.length, 3, 'Berme links vom Hauptgerinne in zwei Teile geteilt');
+});
+
+test('Nebengerinne nur für Zuläufe auf Höhe der Berme, nicht für den Hauptzulauf', () => {
+  const T = 2.4;
+  const cons = [
+    { dir: 'out', clock: 12, dn: 300, isReference: true, lageMode: 'unten', lageValue: 0 },
+    { dir: 'in', clock: 6, dn: 300, lageMode: 'unten', lageValue: 0 },
+    { dir: 'in', clock: 9, dn: 150, lageMode: 'unten', lageValue: 0.05 },
+    { dir: 'in', clock: 3, dn: 150, lageMode: 'unten', lageValue: 0.9 },
+    { dir: 'closed', clock: 2, dn: 150, lageMode: 'unten', lageValue: 0 },
+  ];
+  const ga = gerinneAnschluesse(cons, T);
+  const haupt = gerinneVerlauf({ uhrZu: ga.uhrZu, uhrAus: ga.uhrAus, rInnen: r, w: 0.15 });
+  const neben = nebenGerinne(cons, { T, ga, hBerme: 0.3, rC: 0.15, rInnen: r, haupt });
+  assert.deepEqual(neben.map((n) => n.uhr), [9], 'nur 9 Uhr (3 Uhr liegt über der Berme, 2 Uhr ist verschlossen)');
+  assert.equal(neben[0].w, 0.075, 'Breite nach DN 150');
+  assert.equal(neben[0].h0, 0.05, 'Sohle beginnt auf Höhe des Zulaufs');
+  assert.ok(neben[0].h1 <= neben[0].h0 + 1e-9, 'Nebengerinne fällt zur Mündung hin (nie bergauf)');
+  const [ex, ez] = neben[0].achse.at(-1);
+  assert.ok(Math.abs(ex) > 0.04, 'endet am Rand des Hauptgerinnes, nicht in dessen Mitte');
+  assert.ok(Math.abs(ex) < 0.15 && Math.abs(ez) < r);
 });
