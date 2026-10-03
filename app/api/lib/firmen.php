@@ -42,25 +42,12 @@ function sb_firma(int $tenant): array
     ];
 }
 
-function sb_lizenz(int $tenant): array
-{
-    $db = sb_db();
-    $st = $db->prepare('SELECT max_users, valid_until, active FROM sb_tenants WHERE id = ?');
-    $st->execute([$tenant]);
-    $t = $st->fetch();
-    $st = $db->prepare('SELECT COUNT(*) FROM sb_users WHERE tenant_id = ? AND active = 1');
-    $st->execute([$tenant]);
-    return [
-        'maxUsers' => $t['max_users'] !== null ? (int) $t['max_users'] : null,
-        'validUntil' => sb_date($t['valid_until'] !== null ? (int) $t['valid_until'] : null),
-        'activeUsers' => (int) $st->fetchColumn(),
-    ];
-}
-
-/** Protokollierte Fehlversuche höchstens 24 Stunden aufbewahren (Datensparsamkeit). */
+/** Fehlversuche höchstens 24 Stunden, abgelaufene Registrierungslinks nicht länger als nötig aufbewahren. */
 function sb_purge_attempts(): void
 {
     sb_db()->prepare('DELETE FROM sb_login_attempts WHERE at < ?')->execute([time() - 86400]);
+    // nicht bestätigte Registrierungen (Angaben und Passwort-Hash am Link) nach Ablauf löschen
+    sb_db()->prepare("DELETE FROM sb_tokens WHERE kind = 'register' AND (expires_at < ? OR used_at IS NOT NULL)")->execute([time()]);
 }
 
 /** Benutzer der eigenen Firma löschen (Admin; nicht sich selbst). Datensätze bleiben erhalten. */
@@ -118,7 +105,7 @@ function handle_login(): never
         sb_fail(429, 'Zu viele Fehlversuche – bitte 15 Minuten warten.');
     }
     $st = $db->prepare(
-        'SELECT u.*, t.name AS tenant, t.active AS tenant_active, t.valid_until FROM sb_users u JOIN sb_tenants t ON t.id = u.tenant_id
+        'SELECT u.*, t.name AS tenant, t.active AS tenant_active, t.valid_until, t.plan FROM sb_users u JOIN sb_tenants t ON t.id = u.tenant_id
          WHERE (u.username = ? OR u.email = ?) AND u.active = 1'
     );
     $st->execute([$login, $login]);
@@ -128,7 +115,7 @@ function handle_login(): never
         usleep(400_000);
         sb_fail(403, 'E-Mail/Benutzername oder Passwort falsch.');
     }
-    sb_check_tenant($u);
+    sb_check_tenant($u, true); // abgelaufen: Anmeldung zum Lesen und Buchen möglich
     if (password_needs_rehash($u['pass_hash'], PASSWORD_DEFAULT)) {
         $db->prepare('UPDATE sb_users SET pass_hash = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $u['id']]);
     }
@@ -320,8 +307,10 @@ function handle_op_tenants(array $u): never
     $records = $by('SELECT tenant_id, type, COUNT(*) AS n, MAX(updated_at) AS last FROM sb_records WHERE deleted = 0 GROUP BY tenant_id, type');
     $photos = $by('SELECT tenant_id, COUNT(*) AS n, SUM(size) AS bytes FROM sb_photos GROUP BY tenant_id');
     $invites = $by("SELECT tenant_id, COUNT(*) AS n FROM sb_tokens WHERE kind = 'invite' AND used_at IS NULL AND expires_at > ? GROUP BY tenant_id", [time()]);
+    $offen = $by("SELECT tenant_id, COUNT(*) AS n FROM sb_auftraege WHERE erledigt_at IS NULL AND art IN ('buchung', 'aenderung', 'kuendigung') GROUP BY tenant_id");
+    $betreiber = $by('SELECT tenant_id FROM sb_users WHERE operator = 1');
     $out = [];
-    foreach ($db->query('SELECT id, name, active, max_users, valid_until, note, contact, created_at FROM sb_tenants ORDER BY name')->fetchAll() as $t) {
+    foreach ($db->query('SELECT id, name, active, max_users, valid_until, note, contact, created_at, plan, abo FROM sb_tenants ORDER BY name')->fetchAll() as $t) {
         $id = (int) $t['id'];
         $rec = [];
         $last = 0;
@@ -341,9 +330,13 @@ function handle_op_tenants(array $u): never
             'projects' => $rec['projects'] ?? 0, 'inspections' => $rec['inspections'] ?? 0,
             'photos' => (int) ($photos[$id][0]['n'] ?? 0), 'photoBytes' => (int) ($photos[$id][0]['bytes'] ?? 0),
             'lastActivity' => $last ?: null, 'openInvites' => (int) ($invites[$id][0]['n'] ?? 0),
+            'plan' => isset($betreiber[$id]) ? 'betreiber' : ($t['plan'] ?: 'pro'), 'abo' => sb_abo_daten($t['abo']),
+            'vertraege' => sb_vertraege_status($id), 'offeneAuftraege' => (int) ($offen[$id][0]['n'] ?? 0),
+            // AVV/AGB: 30 Tage nach Ende lesbar, danach löschen
+            'loeschfaellig' => $t['valid_until'] !== null && (int) $t['valid_until'] < time() - 30 * 86400,
         ];
     }
-    sb_json(['tenants' => $out]);
+    sb_json(['tenants' => $out, 'plattform' => sb_plattform_public(), 'vertrag' => SB_VERTRAG]);
 }
 
 function handle_op_tenant_save(array $u): never
@@ -359,14 +352,15 @@ function handle_op_tenant_save(array $u): never
     $valid = sb_parse_date($in['validUntil'] ?? '');
     $note = sb_cut(trim((string) ($in['note'] ?? '')), 1000);
     $contact = sb_cut(trim((string) ($in['contact'] ?? '')), 190);
+    $plan = ($in['plan'] ?? 'pro') === 'test' ? 'test' : 'pro';
     $db = sb_db();
     if (!empty($in['id'])) {
         $id = (int) $in['id'];
         if ($id === $u['tenant_id'] && !$active) {
             sb_fail(400, 'Die eigene Firma kann nicht gesperrt werden.');
         }
-        $st = $db->prepare('UPDATE sb_tenants SET name = ?, active = ?, max_users = ?, valid_until = ?, note = ?, contact = ? WHERE id = ?');
-        $st->execute([$name, $active, $max, $valid, $note, $contact, $id]);
+        $st = $db->prepare('UPDATE sb_tenants SET name = ?, active = ?, max_users = ?, valid_until = ?, note = ?, contact = ?, plan = ? WHERE id = ?');
+        $st->execute([$name, $active, $max, $valid, $note, $contact, $plan, $id]);
         if (!$st->rowCount()) {
             $chk = $db->prepare('SELECT id FROM sb_tenants WHERE id = ?');
             $chk->execute([$id]);
@@ -376,8 +370,8 @@ function handle_op_tenant_save(array $u): never
         }
         sb_json(['ok' => true, 'id' => $id]);
     }
-    $db->prepare('INSERT INTO sb_tenants (name, created_at, active, max_users, valid_until, note, contact) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, time(), $active, $max, $valid, $note, $contact]);
+    $db->prepare('INSERT INTO sb_tenants (name, created_at, active, max_users, valid_until, note, contact, plan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, time(), $active, $max, $valid, $note, $contact, $plan]);
     $id = (int) $db->lastInsertId();
     $invite = null;
     if (trim((string) ($in['adminEmail'] ?? '')) !== '') {

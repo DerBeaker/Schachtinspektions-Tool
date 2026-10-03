@@ -56,7 +56,7 @@ function sb_install_schema(): void
 
 // ---------------------------------------------------------------- Migrationen
 
-const SB_SCHEMA_VERSION = 2;
+const SB_SCHEMA_VERSION = 3;
 
 function sb_columns(string $table): array
 {
@@ -90,6 +90,8 @@ function sb_has_index(string $table, string $name): bool
 /**
  * Version 2 (mehrere Firmen): Lizenzfelder und Firmendaten je Mandant, E-Mail-Anmeldung,
  * Betreiber-Kennzeichen, Einladungen und Passwort-Links.
+ * Version 3 (Tarife): Tarif und Abo je Firma, Registrierungsdaten an Einmal-Links,
+ * angenommene Verträge (AGB/AVV) und Aufträge (Buchung, Änderung, Kündigung).
  */
 function sb_migrate(): void
 {
@@ -116,6 +118,21 @@ function sb_migrate(): void
     sb_add_column('sb_users', 'email', 'TEXT', 'VARCHAR(190) NULL');
     sb_add_column('sb_users', 'operator', 'INTEGER NOT NULL DEFAULT 0', 'TINYINT NOT NULL DEFAULT 0');
     sb_add_column('sb_users', 'last_login', 'INTEGER', 'BIGINT NULL');
+    // Version 3: Tarife, Verträge, Aufträge (bestehende Firmen wurden vom Betreiber angelegt -> „pro“)
+    sb_add_column('sb_tenants', 'plan', "TEXT NOT NULL DEFAULT 'pro'", "VARCHAR(10) NOT NULL DEFAULT 'pro'");
+    sb_add_column('sb_tenants', 'abo', 'TEXT', 'TEXT NULL');
+    sb_add_column('sb_tokens', 'data', 'TEXT', 'TEXT NULL');
+    $db->exec($lite
+        ? 'CREATE TABLE IF NOT EXISTS sb_vertraege (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, firma TEXT, art TEXT NOT NULL,
+            version TEXT NOT NULL, accepted_at INTEGER NOT NULL, user_id INTEGER, name TEXT, funktion TEXT, email TEXT)'
+        : "CREATE TABLE IF NOT EXISTS sb_vertraege (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, tenant_id INT UNSIGNED NOT NULL, firma VARCHAR(120) NULL,
+            art VARCHAR(10) NOT NULL, version VARCHAR(20) NOT NULL, accepted_at BIGINT NOT NULL, user_id INT UNSIGNED NULL, name VARCHAR(120) NULL,
+            funktion VARCHAR(80) NULL, email VARCHAR(190) NULL, INDEX (tenant_id)) $opt");
+    $db->exec($lite
+        ? 'CREATE TABLE IF NOT EXISTS sb_auftraege (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, firma TEXT, user_id INTEGER,
+            art TEXT NOT NULL, created_at INTEGER NOT NULL, daten TEXT, erledigt_at INTEGER)'
+        : "CREATE TABLE IF NOT EXISTS sb_auftraege (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, tenant_id INT UNSIGNED NOT NULL, firma VARCHAR(120) NULL,
+            user_id INT UNSIGNED NULL, art VARCHAR(20) NOT NULL, created_at BIGINT NOT NULL, daten TEXT NULL, erledigt_at BIGINT NULL, INDEX (tenant_id)) $opt");
     if (!sb_has_index('sb_users', 'sb_users_email')) {
         $db->exec('CREATE UNIQUE INDEX sb_users_email ON sb_users (email)');
     }

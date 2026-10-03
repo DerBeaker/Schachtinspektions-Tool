@@ -244,13 +244,19 @@ test('Mehrere Firmen: Betreiber, Einladung, Lizenz, Firmendaten, Passwort verges
   assert.equal(t.admins[0].email, 'chef@rohr-kanal.de');
   assert.ok(r.data.tenants.find((x) => x.own));
 
-  // Lizenz abgelaufen bzw. Firma gesperrt -> kein Zugang mehr
+  // Lizenz abgelaufen -> nur noch lesen (Daten abrufen, Abo buchen); gesperrt -> kein Zugang
   r = await api('op-tenant', { method: 'POST', token: op, body: { id: firmaId, name: 'Rohr & Kanal KG', maxUsers: 2, validUntil: '2020-01-31' } });
   assert.equal(r.status, 200);
-  r = await api('sync', { method: 'POST', token: chef, body: { since: 0, changes: [] } });
+  r = await api('sync', { method: 'POST', token: chef, body: { since: 0, changes: [
+    { type: 'projects', id: 'abgelaufen-1', projectId: 'abgelaufen-1', updatedAt: 5, data: { id: 'abgelaufen-1', name: 'x' } }] } });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.data.nurLesen, r.data.accepted, r.data.lizenz.expired, r.data.lizenz.xml], [true, 0, true, false]);
+  r = await api('invite', { method: 'POST', token: chef, body: { email: 'neu@rohr-kanal.de' } });
   assert.equal(r.status, 403);
   assert.match(r.data.error, /31\.01\.2020 abgelaufen/);
-  assert.equal((await login('chef@rohr-kanal.de', 'chef-pass-1')).status, 403);
+  r = await login('chef@rohr-kanal.de', 'chef-pass-1');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.lizenz.expired, true);
   await api('op-tenant', { method: 'POST', token: op, body: { id: firmaId, name: 'Rohr & Kanal KG', active: false } });
   r = await login('chef@rohr-kanal.de', 'chef-pass-1');
   assert.match(r.data.error, /gesperrt/);
@@ -278,6 +284,102 @@ test('Mehrere Firmen: Betreiber, Einladung, Lizenz, Firmendaten, Passwort verges
   r = await api('op-tenants', { token: op });
   assert.ok(!r.data.tenants.some((x) => x.id === firmaId));
   assert.equal((await login('mia@rohr-kanal.de', 'neues-pass-9')).status, 403);
+});
+
+test('Tarife: Registrierung mit AGB/AVV, Buchung, Kündigung, Betreiber', { skip }, async () => {
+  const login = async (username, password) => (await api('login', { method: 'POST', body: { username, password } }));
+  const mails = () => readFileSync(mailLog, 'utf8');
+  const lastLink = (kind) => {
+    const all = mails().match(new RegExp(`#/${kind}/([a-f0-9]{48})`, 'g')) || [];
+    return all.length ? all[all.length - 1].split('/').pop() : null;
+  };
+  const tag = 86400e3;
+  const op = (await login('admin', 'geheim-12345')).data.token;
+  let r = await api('ping');
+  assert.equal(r.data.plattform.freigegeben, false);
+  assert.deepEqual(r.data.plattform.vertrag, { agb: '1.0', avv: '1.0' });
+  const reg = { firma: 'Kanalprüfung Süd GmbH', anschrift: 'Teststraße 5\n99999 Prüfstadt', name: 'Paula Prüf', funktion: 'Geschäftsführerin', email: 'Paula@Kanal-Sued.test', password: 'paula-pass-1', unternehmer: true, agb: '1.0', avv: '1.0' };
+  // erst nach Freigabe durch den Betreiber
+  assert.equal((await api('register', { method: 'POST', body: reg })).status, 403);
+  assert.equal((await api('op-plattform', { method: 'POST', token: (await login('fremd', 'fremd-12345')).data.token, body: { freigegeben: true } })).status, 403);
+  r = await api('op-plattform', { method: 'POST', token: op, body: { freigegeben: true, testTage: 30, preise: { monat: 25, jahr: 250, inklusive: 3, zusatzMonat: 5, zusatzJahr: 50 } } });
+  assert.equal(r.data.plattform.freigegeben, true);
+  assert.equal((await api('register', { method: 'POST', body: { ...reg, avv: '0.9' } })).status, 400);
+  assert.equal((await api('register', { method: 'POST', body: { ...reg, unternehmer: false } })).status, 400);
+  assert.equal((await api('register', { method: 'POST', body: { ...reg, anschrift: '' } })).status, 400);
+  const vorher = mails().length;
+  assert.equal((await api('register', { method: 'POST', body: { ...reg, website: 'http://spam' } })).status, 200); // Honeypot
+  assert.equal(mails().length, vorher);
+  r = await api('register', { method: 'POST', body: reg });
+  assert.equal(r.status, 200);
+  const tok = lastLink('registrierung');
+  assert.ok(tok);
+  r = await api('register-confirm', { method: 'POST', body: { token: tok } });
+  assert.equal(r.status, 200);
+  const paula = r.data.token;
+  const l = r.data.lizenz;
+  assert.deepEqual([r.data.user.role, r.data.user.email, l.plan, l.xml, l.expired, l.maxUsers, l.vertragOffen], ['admin', 'paula@kanal-sued.test', 'test', true, false, 3, false]);
+  assert.equal(Math.round((Date.parse(l.validUntil) - Date.parse(new Date().toISOString().slice(0, 10))) / tag), 30);
+  assert.equal(r.data.firma.anschrift, reg.anschrift);
+  assert.equal((await api('register-confirm', { method: 'POST', body: { token: tok } })).status, 410);
+  assert.match(mails(), /Auftragsverarbeitungsvertrag nach Art\. 28 DSGVO, Fassung 1\.0/);
+  assert.match(mails(), /Angenommen von: Paula Prüf \(Geschäftsführerin\)/);
+  // gleiche Adresse noch einmal: keine Auskunft in der Antwort, Hinweis nur per E-Mail
+  r = await api('register', { method: 'POST', body: reg });
+  assert.equal(r.status, 200);
+  assert.match(mails(), /Sie haben bereits einen Zugang/);
+
+  r = await api('konto', { token: paula });
+  assert.deepEqual(r.data.vertraege.map((v) => v.art).sort(), ['agb', 'avv']);
+  assert.equal(r.data.vertraege[0].funktion, 'Geschäftsführerin');
+  // Buchung im Testzeitraum: Abrechnung beginnt nach dessen Ende
+  const bestellung = { intervall: 'monat', benutzer: 4, rechnung: { firma: reg.firma, anschrift: reg.anschrift, email: 'rechnung@kanal-sued.test' }, bestellt: true };
+  assert.equal((await api('konto-buchen', { method: 'POST', token: paula, body: { ...bestellung, bestellt: false } })).status, 400);
+  r = await api('konto-buchen', { method: 'POST', token: paula, body: bestellung });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.data.lizenz.plan, r.data.lizenz.validUntil, r.data.lizenz.maxUsers, r.data.abo.preis], ['pro', null, 4, 30]);
+  assert.equal((Date.parse(r.data.abo.seit) - Date.parse(l.validUntil)) / tag, 1);
+  assert.match(mails(), /Bestellbestätigung[\s\S]*30,00 € je Monat zzgl\. gesetzlicher Umsatzsteuer/);
+  // Kündigung noch im Test: endet mit dem Testzeitraum, es entstehen keine Kosten
+  r = await api('konto-kuendigen', { method: 'POST', token: paula });
+  assert.deepEqual([r.data.lizenz.validUntil, r.data.abo.endet], [l.validUntil, l.validUntil]);
+  assert.equal((await api('konto-kuendigen', { method: 'POST', token: paula })).status, 400);
+  assert.match(mails(), /Kündigungsbestätigung/);
+  // doch wieder buchen, noch im Test: Abrechnung beginnt weiterhin erst nach dem Test
+  r = await api('konto-buchen', { method: 'POST', token: paula, body: bestellung });
+  assert.deepEqual([r.data.lizenz.validUntil, r.data.abo.endet, (Date.parse(r.data.abo.seit) - Date.parse(l.validUntil)) / tag], [null, null, 1]);
+  r = await api('konto-kuendigen', { method: 'POST', token: paula });
+  assert.equal(r.data.abo.endet, l.validUntil);
+
+  // Betreiber: Aufträge und Vertragsstand je Firma
+  r = await api('op-auftraege', { token: op });
+  assert.deepEqual(r.data.auftraege.filter((a) => a.firma === reg.firma).map((a) => a.art), ['kuendigung', 'buchung', 'kuendigung', 'buchung', 'registrierung']);
+  r = await api('op-tenants', { token: op });
+  let t = r.data.tenants.find((x) => x.name === reg.firma);
+  assert.deepEqual([t.plan, t.vertraege.avv.version, t.offeneAuftraege], ['pro', '1.0', 4]);
+  assert.equal(r.data.tenants.find((x) => x.own).plan, 'betreiber');
+
+  // Vom Betreiber angelegte Firma: Verträge nachträglich annehmen, dann buchen (ohne Test: ab heute)
+  r = await api('op-tenant', { method: 'POST', token: op, body: { name: 'Alt GmbH', plan: 'pro', adminEmail: 'alt@alt.test', adminName: 'Alf' } });
+  r = await api('invite-accept', { method: 'POST', body: { token: lastLink('einladung'), name: 'Alf Alt', password: 'alf-pass-12' } });
+  const alt = r.data.token;
+  assert.equal(r.data.lizenz.vertragOffen, true);
+  assert.equal((await api('konto-buchen', { method: 'POST', token: alt, body: bestellung })).status, 409);
+  assert.equal((await api('vertrag', { method: 'POST', token: alt, body: { arten: ['avv'], versionen: { avv: '0.1' }, name: 'Alf Alt', funktion: 'Inhaber' } })).status, 409);
+  r = await api('vertrag', { method: 'POST', token: alt, body: { arten: ['agb', 'avv'], versionen: { agb: '1.0', avv: '1.0' }, name: 'Alf Alt', funktion: 'Inhaber' } });
+  assert.equal(r.data.lizenz.vertragOffen, false);
+  r = await api('konto-buchen', { method: 'POST', token: alt, body: { ...bestellung, intervall: 'jahr', benutzer: 3 } });
+  assert.deepEqual([r.data.abo.seit, r.data.abo.preis], [new Date().toISOString().slice(0, 10), 250]);
+  r = await api('konto-kuendigen', { method: 'POST', token: alt });
+  const tageBisEnde = (Date.parse(r.data.abo.endet) - Date.now()) / tag;
+  assert.ok(tageBisEnde > 360 && tageBisEnde < 367, `Jahresabo endet nach einem Jahr (${r.data.abo.endet})`);
+  // Betreiber-Firma: kein Vertrag, kein Abo, Export immer erlaubt
+  r = await api('me', { token: op });
+  assert.deepEqual([r.data.lizenz.plan, r.data.lizenz.xml, r.data.lizenz.vertragOffen], ['betreiber', true, false]);
+  assert.equal((await api('vertrag', { method: 'POST', token: op, body: { arten: ['avv'], versionen: { avv: '1.0' }, name: 'X', funktion: 'Y' } })).status, 400);
+  // Inspekteure sehen Abo & Verträge nicht
+  t = (await api('op-tenants', { token: op })).data.tenants.find((x) => x.name === 'Alt GmbH');
+  assert.equal(t.vertraege.agb.name, 'Alf Alt');
 });
 
 test('E-Mail per SMTP (Anmeldung, Umlaute, falsches Passwort)', { skip: !hasPhp && 'PHP fehlt' }, async () => {

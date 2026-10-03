@@ -135,7 +135,58 @@ await page.screenshot({ path: `${outDir}/11b-einstellungen.png`, fullPage: true 
 await page.goBack();
 await page.getByText('S1005').first().waitFor();
 
-step('Export');
+step('Basis: XML-Export gesperrt, Tarifseite, Registrierung (Server simuliert)');
+const projektHash = await page.evaluate(() => location.hash);
+await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
+await page.getByText(/gehört zu Schachtblick Pro/).waitFor();
+if (await page.getByRole('button', { name: 'Exportieren' }).count()) errors.push('Basis: Export-Knopf sichtbar');
+await page.screenshot({ path: `${outDir}/12-export-basis.png`, fullPage: true });
+{
+  // Firmenkonto simulieren: Antworten des Servers im Browser abfangen
+  const heute = new Date();
+  const testBis = new Date(heute.getTime() + 30 * 86400e3).toISOString().slice(0, 10);
+  const lizenz = { plan: 'test', xml: true, expired: false, validUntil: testBis, maxUsers: 3, activeUsers: 1, abo: null, vertrag: { agb: '1.0', avv: '1.0' }, vertragOffen: false };
+  const user = { id: 7, name: 'Paula Prüf', username: 'paula@kanal.test', email: 'paula@kanal.test', role: 'admin', operator: false, tenant: 'Kanal-Service Prüfmann GmbH' };
+  const anfragen = [];
+  await page.route(/\/api\/\?r=/, async (route) => {
+    const r = new URL(route.request().url()).searchParams.get('r');
+    anfragen.push(r);
+    const json = (data) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+    if (r === 'ping') return json({ ok: true, version: 'e2e', installed: true, plattform: { freigegeben: true, testTage: 30, steuer: 'zzgl. gesetzlicher Umsatzsteuer', preise: { monat: 25, jahr: 250, inklusive: 3, zusatzMonat: 5, zusatzJahr: 50 }, vertrag: { agb: '1.0', avv: '1.0' } } });
+    if (r === 'register') {
+      const b = route.request().postDataJSON();
+      if (b.agb !== '1.0' || b.avv !== '1.0' || !b.unternehmer || b.funktion !== 'Geschäftsführerin') errors.push('Registrierung: Angaben unvollständig ' + JSON.stringify({ ...b, password: '…' }));
+      return json({ ok: true, email: b.email });
+    }
+    if (r === 'register-confirm') return json({ token: 'e2e-token', user, features: {}, lizenz });
+    if (r === 'me') return json({ user, features: {}, lizenz });
+    if (r === 'sync') return json({ rev: 1, more: false, changes: [], photos: [], accepted: 0, skipped: 0, nurLesen: false, lizenz });
+    return json({ ok: true });
+  });
+  await page.getByRole('button', { name: 'Pro ansehen · kostenlos testen' }).click();
+  await page.getByText(/25\s€/).first().waitFor();
+  await page.screenshot({ path: `${outDir}/12a-tarife.png`, fullPage: true });
+  await page.getByRole('button', { name: '30 Tage kostenlos testen' }).click();
+  await page.getByLabel('Ihre Funktion').fill('Geschäftsführerin');
+  await page.getByLabel('Ihr Name').fill('Paula Prüf');
+  await page.getByLabel('E-Mail-Adresse (Anmeldung)').fill('paula@kanal.test');
+  await page.getByLabel('Passwort (mind. 8 Zeichen)').fill('paula-pass-1');
+  await page.getByLabel('Passwort wiederholen').fill('paula-pass-1');
+  await page.getByRole('button', { name: 'Firmenkonto anlegen' }).click();
+  await page.getByText('Bitte die drei Kästchen bestätigen.').waitFor();
+  for (const cb of await page.locator('.check-row input').all()) await cb.check();
+  await page.screenshot({ path: `${outDir}/12b-registrieren.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Firmenkonto anlegen' }).click();
+  await page.getByText('Fast geschafft!').waitFor();
+  await page.evaluate(() => { location.hash = '#/registrierung/' + 'a'.repeat(48); });
+  await page.getByText('Willkommen bei Schachtblick Pro!').waitFor();
+  await shot('12c-willkommen');
+  await page.evaluate((h) => { location.hash = h; }, projektHash);
+  await page.getByText('S1005').first().waitFor();
+  if (!anfragen.includes('register-confirm')) errors.push('Bestätigungslink nicht an den Server geschickt');
+}
+
+step('Export (Pro)');
 await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
 await page.getByRole('button', { name: 'Exportieren' }).waitFor();
 await shot('12-export');
@@ -179,7 +230,7 @@ async function exportAs(format) {
 }
 {
   const z = await exportAs('m150');
-  await shot('12b-export-m150');
+  await shot('12d-export-m150');
   const expect = (re, msg) => { if (!re.test(z)) errors.push('M150: ' + msg); };
   expect(/<DATA>\s*<FD>\s*<FD001>04-2010<\/FD001>\s*<FD002>B<\/FD002>/, 'Kopf FD fehlt');
   expect(/<KG001>S1005<\/KG001>/, 'Knoten S1005 fehlt');
@@ -219,7 +270,7 @@ await page.getByLabel('Tiefenstaffel (m)').fill('1,5; 2,5');
     if (!/S1005/.test(x)) errors.push('Aufmaß-Excel: S1005 fehlt');
   } catch { /* unzip fehlt */ }
 }
-await page.screenshot({ path: `${outDir}/12d-berichte.png`, fullPage: true });
+await page.screenshot({ path: `${outDir}/12e-berichte.png`, fullPage: true });
 
 step('Höhenangaben auf „von oben“ umstellen');
 await page.goBack();
@@ -227,7 +278,7 @@ await page.getByText('S1005', { exact: true }).click();
 await page.getByRole('tab', { name: /Daten/ }).click();
 await page.getByRole('radio', { name: 'von oben ↓' }).click();
 await page.getByText('Anfang am Deckel = 0,00 m').waitFor();
-await shot('12c-von-oben');
+await shot('12f-von-oben');
 await page.goBack();
 await page.getByRole('button', { name: 'Export & Berichte', exact: true }).click();
 await page.getByRole('button', { name: 'Exportieren' }).waitFor();

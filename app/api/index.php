@@ -6,6 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib/bootstrap.php';
 require __DIR__ . '/lib/schema.php';
 require __DIR__ . '/lib/firmen.php';
+require __DIR__ . '/lib/konto.php';
 
 set_exception_handler(function (Throwable $e) {
     error_log('[schachtblick] ' . $e);
@@ -19,7 +20,8 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 switch ("$method $route") {
     case 'GET ping':
-        sb_json(['ok' => true, 'version' => SB_VERSION, 'installed' => sb_is_installed(), 'ai' => sb_ai_enabled()]);
+        $installed = sb_is_installed();
+        sb_json(['ok' => true, 'version' => SB_VERSION, 'installed' => $installed, 'ai' => sb_ai_enabled(), 'plattform' => $installed ? sb_plattform_public() : null]);
 
     case 'POST login':
         handle_login();
@@ -32,11 +34,11 @@ switch ("$method $route") {
         sb_json(['ok' => true]);
 
     case 'GET me':
-        $u = sb_user();
+        $u = sb_user(true);
         sb_json(['user' => sb_public_user($u), 'features' => ['ai' => sb_ai_enabled()], 'firma' => sb_firma($u['tenant_id']), 'lizenz' => sb_lizenz($u['tenant_id'])]);
 
     case 'GET firma':
-        sb_json(['firma' => sb_firma(sb_user()['tenant_id'])]);
+        sb_json(['firma' => sb_firma(sb_user(true)['tenant_id'])]);
 
     case 'POST firma':
         handle_firma_save(sb_user());
@@ -62,6 +64,33 @@ switch ("$method $route") {
     case 'POST reset':
         handle_reset();
 
+    case 'POST register':
+        handle_register();
+
+    case 'POST register-confirm':
+        handle_register_confirm();
+
+    case 'GET konto':
+        handle_konto(sb_user(true));
+
+    case 'POST vertrag':
+        handle_vertrag(sb_user(true));
+
+    case 'POST konto-buchen':
+        handle_konto_buchen(sb_user(true));
+
+    case 'POST konto-kuendigen':
+        handle_konto_kuendigen(sb_user(true));
+
+    case 'POST op-plattform':
+        handle_op_plattform(sb_user());
+
+    case 'GET op-auftraege':
+        handle_op_auftraege(sb_user());
+
+    case 'POST op-auftrag':
+        handle_op_auftrag(sb_user());
+
     case 'GET op-tenants':
         handle_op_tenants(sb_user());
 
@@ -81,16 +110,16 @@ switch ("$method $route") {
         handle_op_mailtest(sb_user());
 
     case 'POST sync':
-        handle_sync(sb_user());
+        handle_sync(sb_user(true));
 
     case 'PUT photo':
         handle_photo_upload(sb_user());
 
     case 'GET photo':
-        handle_photo_download(sb_user());
+        handle_photo_download(sb_user(true));
 
     case 'GET users':
-        $u = sb_user();
+        $u = sb_user(true);
         sb_require_admin($u);
         $st = sb_db()->prepare('SELECT id, username, email, name, role, active, last_login FROM sb_users WHERE tenant_id = ? ORDER BY name');
         $st->execute([$u['tenant_id']]);
@@ -106,7 +135,7 @@ switch ("$method $route") {
         handle_user_delete(sb_user());
 
     case 'POST password':
-        handle_password(sb_user());
+        handle_password(sb_user(true));
 
     case 'POST ai':
         $u = sb_user();
@@ -132,6 +161,11 @@ function handle_sync(array $u): never
     }
     $db = sb_db();
     $tenant = $u['tenant_id'];
+    // Lizenz abgelaufen: Daten nur noch abrufen, Änderungen werden nicht angenommen
+    $nurLesen = sb_abgelaufen($u);
+    if ($nurLesen) {
+        $changes = [];
+    }
     $sel = $db->prepare('SELECT updated_at FROM sb_records WHERE tenant_id = ? AND type = ? AND id = ?');
     $ins = $db->prepare('INSERT INTO sb_records (tenant_id, type, id, project_id, rev, updated_at, deleted, data, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $upd = $db->prepare('UPDATE sb_records SET project_id = ?, rev = ?, updated_at = ?, deleted = ?, data = ?, updated_by = ? WHERE tenant_id = ? AND type = ? AND id = ?');
@@ -204,7 +238,10 @@ function handle_sync(array $u): never
     }
     $st = $db->prepare('SELECT firma_updated FROM sb_tenants WHERE id = ?');
     $st->execute([$tenant]);
-    sb_json(['rev' => $maxRev, 'more' => $more, 'changes' => $out, 'photos' => $photos, 'accepted' => $accepted, 'skipped' => $skipped, 'firmaUpdated' => (int) $st->fetchColumn()]);
+    sb_json([
+        'rev' => $maxRev, 'more' => $more, 'changes' => $out, 'photos' => $photos, 'accepted' => $accepted, 'skipped' => $skipped,
+        'firmaUpdated' => (int) $st->fetchColumn(), 'nurLesen' => $nurLesen, 'lizenz' => sb_lizenz($tenant),
+    ]);
 }
 
 function sb_photo_path(int $tenant, string $id): string

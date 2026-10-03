@@ -87,8 +87,9 @@ ausgeschaltet, solange `anthropic_api_key` leer ist.
 
 ## 8. Erster Test
 
-1. `https://app.mmse-software.com` öffnen → **Einstellungen** → Team-Server: Adresse leer lassen,
-   mit E-Mail und Passwort anmelden.
+1. `https://app.mmse-software.com` öffnen → **Einstellungen** → Firmenkonto: mit E-Mail und Passwort
+   anmelden. Das Feld „Server-Adresse“ (unter „Erweitert“) bleibt leer – die App findet den Server
+   automatisch unter `…/api/`. Die Datenbank-Zugangsdaten stehen nur in `api/config.php`.
 2. **Betreiber-Bereich** → **Firma anlegen**: z. B. eine Testfirma mit „Test 30 Tage“, max. 3 Benutzer
    und der E-Mail-Adresse ihres Administrators. Die Einladung geht per Mail raus und wird angezeigt.
 3. Einladungslink auf dem Handy öffnen → Name und Passwort festlegen → angemeldet.
@@ -125,24 +126,46 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
 | Kartenhintergrund fehlt | Internetverbindung nötig (basemap.de / OpenStreetMap); Schächte werden trotzdem angezeigt |
 | `api/lib/` im Browser erreichbar | `.htaccess`-Dateien wurden nicht hochgeladen (versteckte Dateien anzeigen) |
 
-## Vor dem Einsatz bei Kunden (Weg A: Betrieb durch MMSE)
+## Kunden: Basis, Pro und Verträge
 
-Bereits in der App:
-- **Impressum** und **Datenschutz** sind auf der Startseite, in den Einstellungen und auf den
-  Einladungsseiten verlinkt (Impressum der Website, eigene Datenschutzhinweise der App unter `#/datenschutz`).
-- **Kein Cookie-Banner nötig:** Die App setzt keine Cookies und nutzt kein Tracking. Gespeichert wird nur,
-  was für den Betrieb nötig ist (Offline-Daten, Anmeldung) – das ist ohne Einwilligung zulässig
-  (§ 25 Abs. 2 Nr. 2 TDDDG).
-- **Karte mit Einwilligung:** Kartenkacheln von basemap.de/OpenStreetMap werden erst nach Klick geladen
-  („Einmal laden“ / „Immer laden“), widerrufbar unter Einstellungen → Darstellung.
-- Löschfunktionen: Benutzer (Firmen-Admin), ganze Firma samt Fotos (Betreiber), Fehlversuche nach 24 Stunden.
+**So funktioniert es für die Kunden**
 
-Noch zu erledigen:
-- Datenschutzhinweise der App (Text in `app/js/views/rechtliches.js`) einmal **rechtlich prüfen** lassen.
-- **Auftragsverarbeitungsvertrag (AVV)** mit IONOS abschließen (im Kundenbereich unter Datenschutz) und den
-  Kundenfirmen einen AVV von MMSE anbieten – MMSE verarbeitet deren Inspektionsdaten in ihrem Auftrag.
-- **Nutzungsbedingungen/AGB** und Preise für die Kundenfirmen festlegen; Lizenzen (Benutzerzahl, Laufzeit)
-  im Betreiber-Bereich pflegen.
+- **Basis (kostenlos, ohne Anmeldung):** Jeder kann die App sofort nutzen. Alle Daten bleiben im Browser
+  auf dem Gerät – es gibt kein gemeinsames Konto, über das andere Firmen etwas sehen könnten. Gesperrt ist
+  nur der XML-Export (ISYBAU, DWA-M 150); PDF-Protokolle und Aufmaß gehen auch in Basis.
+- **Pro (Firmenkonto):** Die Firma registriert sich selbst (Tarife → „30 Tage kostenlos testen“), bestätigt
+  ihre E-Mail-Adresse und nimmt dabei **Nutzungsbedingungen und AVV** per Häkchen an – mit Name, Funktion
+  und Zeitpunkt, wie bei IONOS. Beide Seiten bekommen eine Bestätigung per E-Mail, der AVV lässt sich als
+  PDF speichern. Jede Firma ist ein eigener Mandant: Ihre Benutzer sehen nur ihre eigenen Daten.
+- **Nach dem Test:** ohne Buchung nur noch lesen (Daten ansehen und laden, kein XML-Export, keine neuen
+  Änderungen auf dem Server). Nach weiteren 30 Tagen zeigt der Betreiber-Bereich „löschen?“.
+- **Pro buchen:** Der Firmen-Administrator bucht unter Einstellungen → **Abo & Verträge** (monatlich oder
+  jährlich, Benutzerzahl, Rechnungsanschrift). Pro ist sofort freigeschaltet, die Abrechnung beginnt nach dem
+  Testzeitraum. Sie bekommen eine E-Mail und sehen die Buchung im Betreiber-Bereich unter **Aufträge** –
+  Rechnung stellen (z. B. mit Ihrem Buchhaltungsprogramm) und den Auftrag als „erledigt“ markieren.
+  Kündigen geht dort ebenfalls (zum Ende des Abrechnungsmonats bzw. Vertragsjahres).
+- Firmen, die Sie selbst angelegt haben, sehen nach dem Update einen Hinweis und nehmen AGB und AVV
+  unter Abo & Verträge nachträglich an.
+
+**Bevor Sie die Freigabe einschalten** (Betreiber-Bereich → **Plattform & Preise**):
+
+1. Texte rechtlich prüfen lassen (Fachanwalt für IT-Recht oder ein AGB-Dienst für SaaS): Nutzungs-
+   bedingungen (`#/agb`), AVV mit Anlagen (`#/avv`), Datenschutzhinweise (`#/datenschutz`). Die Texte stehen
+   in `app/js/data/vertraege.js` bzw. `app/js/views/rechtliches.js`. Bei inhaltlichen Änderungen die
+   Fassung erhöhen (dort **und** in `app/api/lib/konto.php`, `SB_VERTRAG`) – Kunden bestätigen dann neu.
+2. Zusagen im AVV einhalten oder anpassen: **mindestens wöchentliche Sicherung** von Datenbank und Fotos,
+   Sicherungen höchstens 90 Tage aufbewahren (Anlage 2); Rechenzentrum in Deutschland (IONOS-Vertrag
+   prüfen, Anlage 3); Meldung von Datenschutzverletzungen innerhalb von 48 Stunden.
+3. Preise und Umsatzsteuer-Hinweis einstellen (Kleinunternehmer: „keine Umsatzsteuer nach § 19 UStG“).
+4. Optional in `config.php`: `'betreiber_email' => 'info@…'` für Benachrichtigungen (sonst die E-Mail
+   des Betreiber-Kontos).
+5. Freigabe einschalten. Danach auf der Website auf `https://app.mmse-software.com/#/pro` verlinken.
+
+Weiterhin gilt:
+- **Kein Cookie-Banner nötig:** keine Cookies, kein Tracking; gespeichert wird nur, was für den Betrieb
+  nötig ist (§ 25 Abs. 2 Nr. 2 TDDDG). Karten erst nach Klick (Einwilligung, widerrufbar).
+- Der „Unterstützen“-Link (PayPal) ist eine freiwillige Spende ohne Gegenleistung. Hinweis: Bei einem
+  Gewerbe sind Spenden Betriebseinnahmen; PayPal erwartet für geschäftliche Zahlungen ein Geschäftskonto.
 - Regelmäßige Sicherung einplanen (siehe oben).
 
 ---

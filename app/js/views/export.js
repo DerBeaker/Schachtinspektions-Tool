@@ -1,5 +1,6 @@
 // Export & Berichte: ISYBAU-Zustandsdaten (2006–2024) oder DWA-M 150 (XML + Fotos als ZIP),
-// Schachtprotokolle als PDF und Aufmaß (PDF/Excel).
+// Schachtprotokolle als PDF und Aufmaß (PDF/Excel). Der XML-Export gehört zu Schachtblick Pro,
+// Berichte und Aufmaß gibt es auch in Basis.
 
 import { h, clear, btn, icon, toast, field, input, select, toggle, badge, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
@@ -11,6 +12,8 @@ import { zipParts } from '../lib/zip.js';
 import { download } from '../core/util.js';
 import { protokollErzeugen, aufmassErzeugen } from './berichte.js';
 import { hatBauteile } from '../isybau/bauteile.js';
+import { sync } from '../sync.js';
+import { APP_NAME } from '../brand.js';
 
 export async function renderExport(view, projectId) {
   const project = await getProject(projectId);
@@ -37,14 +40,31 @@ export async function renderExport(view, projectId) {
     }));
     clear(summary, h('div', { class: 'card card-pad stack' },
       h('div', { class: 'row' },
-        h('div', { class: 'item-icon' }, icon('file')),
+        h('div', { class: 'item-icon' }, icon(sync.xmlErlaubt() ? 'file' : 'lock')),
         h('div', { class: 'grow' },
           h('h3', `${items.length} von ${manholes.length} Schächten im Export`),
           h('div', { class: 'muted small' }, errs ? `${errs} Inspektion(en) mit Fehlern – bitte vor der Abgabe prüfen.` : 'Alle enthaltenen Inspektionen sind plausibel.'))),
-      btn('Exportieren', { icon: 'download', variant: 'primary', block: true, disabled: !items.length, onClick: doExport })));
+      sync.xmlErlaubt()
+        ? btn('Exportieren', { icon: 'download', variant: 'primary', block: true, disabled: !items.length, onClick: doExport })
+        : proHinweis()));
+  }
+
+  // Basis: XML-Export gesperrt – Weg zu Pro je nach Anmeldung
+  function proHinweis() {
+    const admin = sync.auth && sync.isAdmin();
+    return h('div', { class: 'stack-sm' },
+      h('div', { class: 'issue warn' }, icon('lock', 18), h('span', sync.auth && sync.abgelaufen()
+        ? 'Der Testzeitraum bzw. die Lizenz Ihrer Firma ist abgelaufen. Der XML-Export ist wieder möglich, sobald Pro gebucht ist.'
+        : `Der XML-Export (ISYBAU, DWA-M 150) gehört zu ${APP_NAME} Pro. Schachtprotokolle und Aufmaß (Berichte & Aufmaß) gibt es auch in der kostenlosen Basis-Version.`)),
+      sync.auth
+        ? (admin ? btn('Pro buchen', { icon: 'star', variant: 'primary', block: true, onClick: () => navigate('#/konto') }) : h('p', { class: 'muted small' }, 'Bitte wenden Sie sich an den Administrator Ihrer Firma.'))
+        : h('div', { class: 'row wrap' },
+          btn('Pro ansehen · kostenlos testen', { icon: 'star', variant: 'primary', onClick: () => navigate('#/pro') }),
+          btn('Anmelden', { variant: 'ghost', onClick: () => navigate('#/settings') })));
   }
 
   async function doExport() {
+    if (!sync.xmlErlaubt()) { toast(`Der XML-Export gehört zu ${APP_NAME} Pro.`, 'info'); return; }
     const items = candidates().map((m) => ({ inspection: m.inspection, manhole: m }));
     try {
       const m150 = opts.version === 'm150';
@@ -59,10 +79,7 @@ export async function renderExport(view, projectId) {
         for (const p of out.photos) {
           const rec = await getPhoto(p.id);
           let blob = rec?.blob;
-          if (!blob && rec?.remote) {
-            const { sync } = await import('../sync.js');
-            blob = await sync.fetchPhoto(rec).catch(() => null);
-          }
+          if (!blob && rec?.remote) blob = await sync.fetchPhoto(rec).catch(() => null);
           if (!blob) { missing++; continue; }
           files.push({ name: `Fotos/${p.file}`, data: new Uint8Array(await blob.arrayBuffer()) });
         }

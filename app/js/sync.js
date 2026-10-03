@@ -6,6 +6,7 @@
 import { db } from './core/db.js';
 import { onChange, getSettings, saveSettings } from './core/store.js';
 import { debounce } from './core/util.js';
+import { PLATTFORM_STANDARD } from './brand.js';
 
 const TYPES = ['projects', 'manholes', 'inspections'];
 const subs = new Set();
@@ -92,6 +93,37 @@ export const sync = {
   isAdmin() { return this.auth?.user?.role === 'admin'; },
   isOperator() { return !!this.auth?.user?.operator; },
 
+  /** Lizenz abgelaufen (Test oder Abo beendet): Daten nur noch lesen. */
+  abgelaufen() {
+    const l = this.auth?.lizenz;
+    if (!l || l.plan === 'betreiber') return false;
+    return !!l.expired || (!!l.validUntil && l.validUntil < new Date().toISOString().slice(0, 10));
+  },
+
+  /** XML-Export (ISYBAU, DWA-M 150) gehört zu Schachtblick Pro – auch offline anhand der gespeicherten Lizenz. */
+  xmlErlaubt() {
+    if (window.SB_DEMO) return true;
+    return !!this.auth?.lizenz?.xml && !this.abgelaufen();
+  },
+
+  /** Plattform-Angaben des Servers (Freigabe, Preise, Testzeitraum); ohne Server die Standardwerte. */
+  async plattform() {
+    if (this._plattform) return this._plattform;
+    try {
+      const s = await getSettings();
+      const r = await this.ping(this.auth?.serverUrl ?? s.serverUrl);
+      if (r.plattform) this._plattform = { ...PLATTFORM_STANDARD, ...r.plattform, server: true };
+    } catch { /* kein Server */ }
+    return this._plattform || { ...PLATTFORM_STANDARD, server: false };
+  },
+
+  async setLizenz(l) {
+    if (!this.auth || !l || JSON.stringify(l) === JSON.stringify(this.auth.lizenz)) return;
+    this.auth.lizenz = l;
+    await db.setMeta('auth', this.auth);
+    window.dispatchEvent(new CustomEvent('app:lizenz'));
+  },
+
   /**
    * Firmendaten vom Server (Name, Anschrift, Kontakt, Logo) in die Einstellungen übernehmen.
    * Hat der Server noch keine, übernimmt ein Administrator die bisher lokal gepflegten.
@@ -132,8 +164,9 @@ export const sync = {
     if (this.auth) {
       this.run();
       this.request('me').then(async (r) => {
-        Object.assign(this.auth, { features: r.features || {}, user: r.user, lizenz: r.lizenz || null });
+        Object.assign(this.auth, { features: r.features || {}, user: r.user });
         await db.setMeta('auth', this.auth);
+        await this.setLizenz(r.lizenz || null);
         if (r.firma && r.firma.updated !== (await db.getMeta('firmaUpdated', 0))) await this.applyFirma(r.firma);
       }).catch(() => {});
     }
@@ -149,9 +182,11 @@ export const sync = {
 
   async _run(manual) {
     this.set({ state: 'busy', message: 'Synchronisiere …' });
+    // Lizenz abgelaufen: nur abrufen, lokale Änderungen bleiben markiert, bis wieder gebucht ist
+    const nurLesen = this.abgelaufen();
     try {
       // 1. Fotos hochladen (Binärdaten zuerst, damit Referenzen gültig sind)
-      const photos = (await db.all('photos')).filter((p) => !p.uploaded && p.blob);
+      const photos = nurLesen ? [] : (await db.all('photos')).filter((p) => !p.uploaded && p.blob);
       for (const p of photos) {
         await this.request('photo', { method: 'PUT', query: { id: p.id, inspection: p.inspectionId, project: p.projectId, w: p.width || 0, h: p.height || 0 }, body: p.blob, raw: true });
         p.uploaded = true;
@@ -160,7 +195,7 @@ export const sync = {
       // 2. Datensätze austauschen
       const changes = [];
       const pushed = [];
-      for (const t of TYPES) {
+      for (const t of nurLesen ? [] : TYPES) {
         for (const r of await db.all(t)) {
           if (!r.dirty) continue;
           const { dirty, ...data } = r;
@@ -171,7 +206,8 @@ export const sync = {
       // kleine Überlappung, damit parallel vergebene Revisionen nicht verloren gehen (Anwenden ist idempotent)
       let since = Math.max(0, ((await db.getMeta('syncRev', 0)) || 0) - 20);
       let res = await this.request('sync', { method: 'POST', body: { since, changes } });
-      for (const [t, id, ts] of pushed) {
+      if (res.lizenz) await this.setLizenz(res.lizenz);
+      for (const [t, id, ts] of res.nurLesen ? [] : pushed) {
         const cur = await db.get(t, id);
         if (cur && cur.updatedAt === ts) { cur.dirty = false; await db.put(t, cur); }
       }
@@ -201,7 +237,8 @@ export const sync = {
       }
       const now = Date.now();
       await db.setMeta('lastSync', now);
-      this.set({ state: 'ok', lastSync: now, message: `Synchronisiert ${new Date(now).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` });
+      const uhr = new Date(now).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      this.set({ state: 'ok', lastSync: now, message: this.abgelaufen() ? `Nur lesen (Lizenz abgelaufen) · abgerufen ${uhr}` : `Synchronisiert ${uhr}` });
       if (applied) window.dispatchEvent(new CustomEvent('app:synced', { detail: { applied } }));
     } catch (e) {
       this.set({ state: 'error', message: e.message });
@@ -235,6 +272,14 @@ export const sync = {
   opDeleteTenant(id, confirm) { return this.request('op-tenant-delete', { method: 'POST', body: { id, confirm } }); },
   opExport(tenant) { return this.request('op-export', { query: { tenant } }); },
   opMailtest(email) { return this.request('op-mailtest', { method: 'POST', body: { email } }); },
+  opPlattform(p) { return this.request('op-plattform', { method: 'POST', body: p }).then((r) => { this._plattform = null; return r; }); },
+  opAuftraege() { return this.request('op-auftraege'); },
+  opAuftragErledigt(id, erledigt) { return this.request('op-auftrag', { method: 'POST', body: { id, erledigt } }); },
+  // Abo & Verträge (Firmen-Administrator)
+  async konto() { const r = await this.request('konto'); await this.setLizenz(r.lizenz); return r; },
+  async vertragAnnehmen(d) { const r = await this.request('vertrag', { method: 'POST', body: d }); await this.setLizenz(r.lizenz); return r; },
+  async buchen(d) { const r = await this.request('konto-buchen', { method: 'POST', body: d }); await this.setLizenz(r.lizenz); return r; },
+  async kuendigen() { const r = await this.request('konto-kuendigen', { method: 'POST', body: {} }); await this.setLizenz(r.lizenz); return r; },
   changePassword(oldPw, newPw) { return this.request('password', { method: 'POST', body: { old: oldPw, new: newPw } }); },
 
   async ai(payload) {

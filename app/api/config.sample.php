@@ -33,6 +33,8 @@ return [
     'mail_from' => 'noreply@mmse-software.com',
     // false = keine E-Mails senden (Links werden dann nur in der App angezeigt)
     'mail' => true,
+    // Benachrichtigungen über Registrierungen, Buchungen und Kündigungen (leer = E-Mail des Betreiber-Kontos)
+    'betreiber_email' => '',
 
     // Nur nötig, wenn App und API auf unterschiedlichen Domains liegen, z. B. ['https://app.example.de']
     'cors_origins' => [],

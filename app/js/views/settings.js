@@ -1,4 +1,4 @@
-// Einstellungen: Inspekteur, Firma (für Berichte), Darstellung, Server-Anmeldung, Speicher, Über.
+// Einstellungen: Inspekteur, Firma (für Berichte), Darstellung, Firmenkonto (Anmeldung, Abo), Speicher, Über.
 
 import { h, clear, btn, icon, toast, field, input, select, toggle, confirmDialog, sheet } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
@@ -10,6 +10,7 @@ import { APP_NAME, APP_VERSION, VENDOR, VENDOR_URL, VENDOR_WEB, VENDOR_TAGLINE }
 import { pickFile } from '../lib/image.js';
 import { debounce, fmtDate } from '../core/util.js';
 import { rechtsLinks } from './rechtliches.js';
+import { planText, spendenLink } from './konto.js';
 
 export function lizenzText(l) {
   const teile = [];
@@ -81,15 +82,19 @@ export async function renderSettings(view) {
   function renderServer() {
     if (sync.auth) {
       const u = sync.auth.user || {};
+      const l = sync.auth.lizenz;
       clear(serverBox,
         h('div', { class: 'row' }, h('div', { class: 'item-icon' }, icon('cloud')),
-          h('div', { class: 'grow' }, h('h3', u.name || u.username), h('div', { class: 'muted small' }, `${u.tenant || ''} · ${sync.auth.serverUrl || 'gleicher Server'}`))),
+          h('div', { class: 'grow' }, h('h3', u.name || u.username), h('div', { class: 'muted small' }, `${u.tenant || ''}${sync.auth.serverUrl ? ` · ${sync.auth.serverUrl}` : ''}`))),
+        l ? h('div', { class: ['issue', sync.abgelaufen() ? 'warn' : 'ok'] }, icon(sync.abgelaufen() ? 'alert' : 'star', 18), h('span', planText(l))) : null,
+        l?.vertragOffen && u.role === 'admin' ? h('div', { class: 'issue warn' }, icon('file', 18), h('span', 'Bitte Nutzungsbedingungen und AVV bestätigen (Abo & Verträge).')) : null,
         h('div', { class: 'muted small' }, sync.status.message || ''),
-        u.role === 'admin' && sync.auth.lizenz ? h('div', { class: 'muted small' }, lizenzText(sync.auth.lizenz)) : null,
+        u.role === 'admin' && l ? h('div', { class: 'muted small' }, lizenzText(l)) : null,
         sync.auth.features?.ai ? h('div', { class: 'badge badge-ai' }, '✦ KI-Assistent verfügbar') : null,
         h('div', { class: 'row wrap' },
           btn('Jetzt synchronisieren', { icon: 'refresh', onClick: async () => { try { await sync.run({ manual: true }); toast('Synchronisiert.', 'ok'); } catch (e) { toast(e.message, 'error'); } renderServer(); } }),
           u.role === 'admin' ? btn('Benutzer verwalten', { icon: 'user', variant: 'soft', onClick: usersSheet }) : null,
+          u.role === 'admin' && !u.operator ? btn('Abo & Verträge', { icon: 'star', variant: 'soft', onClick: () => navigate('#/konto') }) : null,
           u.operator ? btn('Betreiber-Bereich', { icon: 'layers', variant: 'soft', onClick: () => navigate('#/betrieb') }) : null,
           u.operator ? btn('E-Mail-Versand testen', { icon: 'upload', variant: 'ghost', onClick: mailTestDialog }) : null,
           btn('Passwort ändern', { variant: 'ghost', onClick: passwordSheet }),
@@ -98,12 +103,13 @@ export async function renderSettings(view) {
     }
     const d = { url: s.serverUrl || '', user: '', pass: '' };
     clear(serverBox,
-      h('h3', 'Team-Server (optional)'),
-      h('p', { class: 'muted small' }, 'Ohne Server arbeitet die App komplett auf diesem Gerät. Mit Server (PHP + MySQL auf dem eigenen Webspace) werden Projekte, Inspektionen und Fotos zwischen Handy und PC synchronisiert.'),
+      h('h3', 'Firmenkonto (Schachtblick Pro)'),
+      h('p', { class: 'muted small' }, 'Sie nutzen Schachtblick Basis: kostenlos und ohne Anmeldung – alle Daten bleiben auf diesem Gerät. Mit einem Firmenkonto kommen der XML-Export, der Abgleich zwischen Handy, PC und Kollegen und die Benutzerverwaltung dazu.'),
+      btn('Pro ansehen · kostenlos testen', { icon: 'star', variant: 'soft', onClick: () => navigate('#/pro') }),
       window.SB_DEMO
-        ? h('div', { class: 'issue warn' }, icon('info', 18), h('span', 'In dieser Demo-Vorschau gibt es keinen Server – Anmeldung und Betreiber-Bereich funktionieren erst in der installierten Version auf dem eigenen Webspace.'))
-        : h('p', { class: 'muted small' }, 'Der Betreiber-Bereich (Firmen und Lizenzen verwalten) erscheint hier nach der Anmeldung mit dem Konto, das bei der Einrichtung (…/api/setup.php) angelegt wurde.'),
-      field('Server-Adresse', input(d.url, (v) => { d.url = v; }, { placeholder: 'leer = gleicher Webspace (…/api/)', inputmode: 'url', autocapitalize: 'off' })),
+        ? h('div', { class: 'issue warn' }, icon('info', 18), h('span', 'In dieser Demo-Vorschau gibt es keinen Server – Anmeldung, Firmenkonto und Betreiber-Bereich funktionieren erst in der installierten Version.'))
+        : null,
+      h('h3', 'Anmelden'),
       h('div', { class: 'grid2' },
         field('E-Mail oder Benutzer', input('', (v) => { d.user = v; }, { autocomplete: 'username', autocapitalize: 'off', inputmode: 'email' })),
         field('Passwort', input('', (v) => { d.pass = v; }, { type: 'password', autocomplete: 'current-password' }))),
@@ -116,14 +122,21 @@ export async function renderSettings(view) {
             renderServer();
           } catch (e) { toast('Anmeldung fehlgeschlagen: ' + e.message, 'error', 6000); }
         } }),
-        btn('Verbindung testen', { variant: 'ghost', onClick: async () => {
-          try {
-            const r = await sync.ping(d.url.trim());
-            if (r.installed === false) toast('Server erreichbar, aber noch nicht eingerichtet – bitte zuerst …/api/setup.php im Browser öffnen.', 'info', 7000);
-            else toast(`Server erreichbar und eingerichtet (v${r.version}${r.ai ? ', KI aktiv' : ''}).`, 'ok');
-          } catch (e) { toast(`${e.message} – ist der Ordner api/ hochgeladen und api/config.php angelegt?`, 'error', 7000); }
-        } }),
-        btn('Passwort vergessen?', { variant: 'ghost', onClick: () => passwortVergessen(d.url.trim(), d.user.trim()) })));
+        btn('Passwort vergessen?', { variant: 'ghost', onClick: () => passwortVergessen(d.url.trim(), d.user.trim()) })),
+      h('details', { class: 'erweitert', open: !!s.serverUrl },
+        h('summary', 'Erweitert: anderer Server'),
+        h('div', { class: 'stack' },
+          h('p', { class: 'muted small' }, 'Normalerweise leer lassen: Die App nutzt automatisch den Server unter ihrer eigenen Adresse (…/api/). Eine Adresse ist nur nötig, wenn App und Server unter verschiedenen Adressen liegen. Die Zugangsdaten zur Datenbank stehen nicht hier, sondern in api/config.php auf dem Webspace.'),
+          field('Server-Adresse', input(d.url, (v) => { d.url = v; }, { placeholder: 'leer = gleicher Server (…/api/)', inputmode: 'url', autocapitalize: 'off' })),
+          h('div', { class: 'row wrap' },
+            btn('Verbindung testen', { variant: 'ghost', onClick: async () => {
+              try {
+                const r = await sync.ping(d.url.trim());
+                if (r.installed === false) toast('Server erreichbar, aber noch nicht eingerichtet – bitte zuerst …/api/setup.php im Browser öffnen.', 'info', 7000);
+                else toast(`Server erreichbar und eingerichtet (v${r.version}${r.ai ? ', KI aktiv' : ''}).`, 'ok');
+              } catch (e) { toast(`${e.message} – ist der Ordner api/ hochgeladen und api/config.php angelegt?`, 'error', 7000); }
+            } })),
+          h('p', { class: 'muted small' }, 'Betreiber: Der Betreiber-Bereich erscheint nach der Anmeldung mit dem Konto, das bei der Einrichtung (…/api/setup.php) angelegt wurde.'))));
   }
 
   async function usersSheet() {
@@ -289,7 +302,8 @@ export async function renderSettings(view) {
             h('a', { class: 'small', href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB))),
         h('p', { class: 'muted small' }, 'Kodiersystem: DIN EN 13508-2:2011 mit nationaler Festlegung nach BFR Abwasser (ISYBAU, Stand 01/2025) bzw. DWA-M 149-2. Austauschformate: ISYBAU XML-2006, -2013, -2017, -2024 und DWA-M 150.'),
         h('p', { class: 'muted small' }, 'Die Kodierung bleibt fachliche Verantwortung des Inspekteurs. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel und ersetzen keine Prüfung bzw. kein Aufmaß.'),
-        h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · `, rechtsLinks()),
+        h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · `, rechtsLinks(), ' · ', h('a', { href: '#/agb' }, 'Nutzungsbedingungen')),
+        h('p', { class: 'small' }, spendenLink(`${APP_NAME} gefällt Ihnen? Freiwillig unterstützen (PayPal)`)),
         h('p', { class: 'muted small' }, 'Kartendaten © basemap.de / BKG, © OpenStreetMap-Mitwirkende · Leaflet (BSD-2-Clause) · three.js (MIT)')))));
   renderServer();
   const info = await storageInfo();

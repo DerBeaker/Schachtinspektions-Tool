@@ -29,6 +29,7 @@ Ein Produkt von **MMSE Software Engineering** – [www.mmse-software.com](https:
 | **Team-Server (optional)** | PHP + MySQL auf dem eigenen Webspace: Anmeldung (E-Mail oder Benutzername, „Passwort vergessen“), Synchronisation Handy ↔ PC, Fotos, Benutzerverwaltung mit Einladungen per E-Mail, Firmendaten und Logo zentral für alle Geräte einer Firma |
 | **Datenschutz** | Keine Cookies, kein Tracking; Impressum- und Datenschutz-Links in der App, eigene Datenschutzhinweise (`#/datenschutz`), Kartenhintergrund erst nach Einwilligung, Löschfunktionen für Benutzer und Firmen |
 | **Mehrere Firmen** | Betreiber-Bereich (MMSE): Firmen anlegen, Administrator per Einladungslink, Lizenz je Firma (Benutzerzahl, Laufzeit, Testzugang), sperren, Daten exportieren oder löschen. Jede Firma sieht nur ihre eigenen Daten |
+| **Tarife** | **Basis** kostenlos ohne Anmeldung (Daten nur auf dem Gerät, kein XML-Export) · **Pro** mit Firmenkonto: XML-Export, Sync, Benutzer. Selbstregistrierung mit E-Mail-Bestätigung und Testzeitraum, Nutzungsbedingungen und AVV (Art. 28 DSGVO) online annehmen inkl. PDF, Pro buchen/ändern/kündigen (Zahlung per Rechnung), Aufträge im Betreiber-Bereich. Freigabe erst nach rechtlicher Prüfung der Texte |
 | **KI-Assistent (optional)** | Fotoanalyse mit Claude: schlägt Anschlüsse und sichtbare Schäden als Kodes vor – der Inspekteur bestätigt oder verwirft |
 | **Tiefe aus dem Foto (experimentell)** | Schätzung über zwei Kreise bekannter Größe (Schachthals oben, Schacht-DN unten) – nur zur Plausibilitätskontrolle |
 
@@ -61,7 +62,7 @@ Jedes Gerät speichert dann seine eigenen Daten; Austausch über ISYBAU-Export.
 2. Im IONOS-Kundenbereich unter *Hosting → Datenbanken* eine **MySQL/MariaDB-Datenbank** anlegen.
 3. `api/config.sample.php` als `api/config.php` kopieren und die Datenbank-Zugangsdaten eintragen.
 4. `https://deine-domain.de/schacht/api/setup.php` aufrufen → Firma und ersten Administrator anlegen (die Seite sperrt sich danach selbst). Dieser erste Benutzer ist **Betreiber** der Installation.
-5. In der App: *Einstellungen → Team-Server* → anmelden. Weitere Benutzer lädt der Administrator dort unter „Benutzer verwalten“ per E-Mail ein; weitere Firmen legt der Betreiber im **Betreiber-Bereich** an.
+5. In der App: *Einstellungen → Firmenkonto* → anmelden (Server-Adresse unter „Erweitert“ leer lassen). Weitere Benutzer lädt der Administrator dort unter „Benutzer verwalten“ per E-Mail ein; weitere Firmen legt der Betreiber im **Betreiber-Bereich** an.
 
 Fotos liegen in `api/data/photos` (per `.htaccess` gesperrt). Besser: in `config.php` einen Pfad **außerhalb** des Webordners eintragen (`photo_dir`).
 
@@ -108,7 +109,7 @@ npm run serve   # lokaler Server auf Port 8080
 node tools/make-test-photo.mjs /tmp/schacht.jpg
 node tools/e2e.mjs http://127.0.0.1:8080/ /tmp/schacht.jpg /tmp/e2e     # Browser-Test (Playwright)
 node tools/e2e-sync.mjs /tmp/schacht.jpg /tmp/e2e-sync                    # Sync Handy → PC
-node tools/e2e-firmen.mjs /tmp/schacht.jpg /tmp/e2e-firmen                # Betreiber, Einladung, Lizenz, Firmendaten
+node tools/e2e-firmen.mjs /tmp/schacht.jpg /tmp/e2e-firmen                # Betreiber, Einladung, Lizenz, Firmendaten, Registrierung, AVV, Buchung
 SB_TEST_MYSQL="mysql:host=…;dbname=leer|benutzer|passwort" node --test tests/api.test.mjs   # Server-Tests gegen MySQL/MariaDB
 npm run paket   # Upload-Paket für den Webspace
 ```

@@ -9,9 +9,30 @@ import { formatLabel } from '../isybau/export.js';
 import { APP_NAME, VENDOR, VENDOR_URL, VENDOR_WEB } from '../brand.js';
 import { rechtsLinks } from './rechtliches.js';
 import { sync } from '../sync.js';
+import { planText, spendenLink } from './konto.js';
 
 const vendorLine = () => h('footer', { class: 'vendor-line muted small' },
-  `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB), ' · ', rechtsLinks());
+  h('div', null, `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB), ' · ', rechtsLinks()),
+  h('div', { class: 'row center wrap', style: { marginTop: '8px', gap: '14px' } },
+    sync.auth ? null : h('a', { href: '#/pro' }, `${APP_NAME} Basis (kostenlos) · Pro ansehen`), spendenLink('Unterstützen')));
+
+/** Hinweise zum Tarif: Basis (ohne Konto), Testzeitraum, abgelaufene Lizenz, offene Verträge. */
+function tarifHinweis() {
+  if (window.SB_DEMO) return null;
+  const karte = (art, ic, text, ...aktionen) => h('div', { class: ['issue', art], style: { marginTop: '12px', alignItems: 'center', flexWrap: 'wrap' } },
+    icon(ic, 18), h('span', { class: 'grow' }, text), ...aktionen);
+  const knopf = (text, ziel) => btn(text, { small: true, variant: 'soft', onClick: () => navigate(ziel) });
+  if (!sync.auth) return null;
+  const l = sync.auth.lizenz;
+  const admin = sync.isAdmin();
+  if (!l || l.plan === 'betreiber') return null;
+  if (sync.abgelaufen()) {
+    return karte('warn', 'lock', `${planText(l)}. ${admin ? 'Mit Pro geht es sofort weiter.' : 'Bitte den Administrator Ihrer Firma ansprechen.'}`, admin ? knopf('Pro buchen', '#/konto') : null);
+  }
+  if (l.vertragOffen && admin) return karte('warn', 'file', 'Bitte bestätigen Sie die Nutzungsbedingungen und den Auftragsverarbeitungsvertrag (AVV) für Ihre Firma.', knopf('Ansehen', '#/konto'));
+  if (l.plan === 'test' && admin) return karte('ok', 'star', planText(l), knopf('Pro buchen', '#/konto'));
+  return null;
+}
 
 export async function renderProjects(view) {
   const settings = await getSettings();
@@ -30,7 +51,10 @@ export async function renderProjects(view) {
     else if (busy) { busy = false; if (leer) neu(); }
   });
   window.addEventListener('app:synced', neu);
-  const cleanup = () => { unsub(); window.removeEventListener('app:synced', neu); };
+  // Tarif geändert (z. B. Pro gebucht, Test abgelaufen): Hinweis neu zeichnen
+  const lizenzNeu = () => neu();
+  window.addEventListener('app:lizenz', lizenzNeu);
+  const cleanup = () => { unsub(); window.removeEventListener('app:synced', neu); window.removeEventListener('app:lizenz', lizenzNeu); };
 
   if (projects.length) view.append(h('button', { class: 'fab', onclick: newProjectSheet, 'aria-label': 'Neues Projekt' }, icon('plus', 24), h('span', 'Projekt')));
   const totals = projects.reduce((a, p) => ({ total: a.total + p.stats.total, fertig: a.fertig + p.stats.fertig, offen: a.offen + p.stats.total - p.stats.fertig }), { total: 0, fertig: 0, offen: 0 });
@@ -52,6 +76,9 @@ export async function renderProjects(view) {
     main.append(h('div', { class: 'issue warn', style: { marginTop: '12px' } }, icon('info', 18),
       h('span', 'Demo-Version: Daten bleiben nur in diesem Browser. Download, Druck, GPS und Team-Server gibt es in der installierten Version.')));
   }
+  const hinweis = tarifHinweis();
+  if (hinweis) main.append(hinweis);
+
   if (!projects.length) {
     main.append(sync.auth && busy
       ? h('div', { class: 'card card-pad row', style: { marginTop: '16px' } }, icon('refresh', 20), h('span', 'Projekte werden vom Server geladen …'))

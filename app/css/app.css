@@ -398,3 +398,27 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .rechtstext h2 { font-size: 1.05rem; margin: 20px 0 6px; }
 .rechtstext p, .rechtstext li { font-size: .93rem; }
 .rechtstext ul { padding-left: 20px; margin: 6px 0; }
+/* Tarife, Registrierung, Verträge */
+.check-row { display: flex; gap: 10px; align-items: flex-start; font-size: .92rem; line-height: 1.4; }
+.check-row input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--primary); }
+.check-row span { cursor: pointer; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.plan { display: flex; flex-direction: column; gap: 10px; }
+.plan.pro { border: 2px solid var(--primary); }
+.plan .preis { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.plan ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.plan li { display: flex; gap: 8px; align-items: flex-start; font-size: .92rem; }
+.plan li .icon { color: var(--ok); flex: none; margin-top: 1px; }
+.plan li.nein .icon { color: var(--muted, #8a97ab); }
+.plan li.nein { color: var(--muted, #8a97ab); }
+.hp-feld { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+details.erweitert { border-top: 1px solid var(--border); padding-top: 10px; }
+details.erweitert summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--muted, inherit); }
+details.erweitert[open] summary { margin-bottom: 10px; }
+.spenden { display: inline-flex; align-items: center; gap: 6px; }
+.spenden .icon { color: #e0457b; }
+.rechtstext h1 { font-size: 1.3rem; margin: 0 0 4px; }
+.rechtstext .parteien { background: var(--primary-soft); border-radius: 10px; padding: 10px 12px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .grid4 { grid-template-columns: 1fr 1fr; } }
+.grid3 > * { min-width: 0; }

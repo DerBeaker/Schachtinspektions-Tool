@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-const SB_VERSION = '0.2.1';
+const SB_VERSION = '0.3.0';
 /** Betreiber der Plattform (erscheint in Hinweisen zu Lizenz und Sperre). */
 const SB_VENDOR = 'MMSE Software Engineering';
 const SB_TYPES = ['projects', 'manholes', 'inspections'];
@@ -120,8 +120,11 @@ function sb_token(): string
     return $t;
 }
 
-/** Liefert den angemeldeten Benutzer oder bricht mit 401 ab. */
-function sb_user(): array
+/**
+ * Liefert den angemeldeten Benutzer oder bricht mit 401 ab. Mit $nurLesen = true reicht eine
+ * abgelaufene Lizenz (Daten ansehen, Abo buchen); gesperrte Firmen bleiben ausgeschlossen.
+ */
+function sb_user(bool $nurLesen = false): array
 {
     $token = sb_token();
     if ($token === '' || strlen($token) > 128) {
@@ -129,7 +132,7 @@ function sb_user(): array
     }
     $st = sb_db()->prepare(
         'SELECT u.id, u.tenant_id, u.username, u.name, u.role, u.email, u.operator, t.name AS tenant,
-                t.active AS tenant_active, t.valid_until, t.max_users, s.expires_at
+                t.active AS tenant_active, t.valid_until, t.max_users, t.plan, s.expires_at
          FROM sb_sessions s JOIN sb_users u ON u.id = s.user_id JOIN sb_tenants t ON t.id = u.tenant_id
          WHERE s.token_hash = ? AND u.active = 1'
     );
@@ -138,7 +141,7 @@ function sb_user(): array
     if (!$u || (int) $u['expires_at'] < time()) {
         sb_fail(401, 'Sitzung abgelaufen.');
     }
-    sb_check_tenant($u);
+    sb_check_tenant($u, $nurLesen);
     // gleitende Verlängerung (höchstens einmal pro Tag)
     $days = (int) (sb_config()['session_days'] ?? 30);
     if ((int) $u['expires_at'] - time() < ($days - 1) * 86400) {
@@ -153,10 +156,10 @@ function sb_user(): array
 }
 
 /**
- * Lizenz und Sperre der Firma prüfen (Zeile mit tenant_active, valid_until, operator).
- * Die Firma des Betreibers ist davon ausgenommen.
+ * Lizenz und Sperre der Firma prüfen (Zeile mit tenant_active, valid_until, operator, plan).
+ * Die Firma des Betreibers ist davon ausgenommen. $nurLesen: abgelaufene Lizenz genügt.
  */
-function sb_check_tenant(array $row): void
+function sb_check_tenant(array $row, bool $nurLesen = false): void
 {
     if (!empty($row['operator'])) {
         return;
@@ -164,9 +167,17 @@ function sb_check_tenant(array $row): void
     if (isset($row['tenant_active']) && (int) $row['tenant_active'] === 0) {
         sb_fail(403, 'Der Zugang Ihrer Firma ist gesperrt. Bitte wenden Sie sich an ' . SB_VENDOR . '.');
     }
-    if (!empty($row['valid_until']) && (int) $row['valid_until'] < time()) {
-        sb_fail(403, 'Die Lizenz Ihrer Firma ist am ' . date('d.m.Y', (int) $row['valid_until'] - 1) . ' abgelaufen. Bitte wenden Sie sich an ' . SB_VENDOR . '.');
+    if (!$nurLesen && sb_abgelaufen($row)) {
+        $was = ($row['plan'] ?? '') === 'test' ? 'Der Testzeitraum Ihrer Firma ist' : 'Die Lizenz Ihrer Firma ist';
+        sb_fail(403, "$was am " . date('d.m.Y', (int) $row['valid_until'] - 1) . ' abgelaufen. Ihre Daten können Sie weiter ansehen; '
+            . 'Schachtblick Pro buchen Sie unter Einstellungen → Abo & Verträge (Administrator) oder bei ' . SB_VENDOR . '.');
     }
+}
+
+/** Lizenz der Firma abgelaufen (Zeile mit valid_until; Betreiber nie)? */
+function sb_abgelaufen(array $row): bool
+{
+    return empty($row['operator']) && !empty($row['valid_until']) && (int) $row['valid_until'] < time();
 }
 
 function sb_require_operator(array $u): void
@@ -356,8 +367,9 @@ function sb_smtp_send(array $s, string $from, string $to, string $subject, strin
 function sb_new_token(string $kind, int $tenant, array $f, int $hours): string
 {
     $token = bin2hex(random_bytes(24));
-    sb_db()->prepare('INSERT INTO sb_tokens (token_hash, kind, tenant_id, user_id, email, name, role, created_at, expires_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([hash('sha256', $token), $kind, $tenant, $f['user_id'] ?? null, $f['email'] ?? null, $f['name'] ?? null, $f['role'] ?? null, time(), time() + $hours * 3600, $f['created_by'] ?? null]);
+    $data = isset($f['data']) ? json_encode($f['data'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+    sb_db()->prepare('INSERT INTO sb_tokens (token_hash, kind, tenant_id, user_id, email, name, role, created_at, expires_at, created_by, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([hash('sha256', $token), $kind, $tenant, $f['user_id'] ?? null, $f['email'] ?? null, $f['name'] ?? null, $f['role'] ?? null, time(), time() + $hours * 3600, $f['created_by'] ?? null, $data]);
     return $token;
 }
 

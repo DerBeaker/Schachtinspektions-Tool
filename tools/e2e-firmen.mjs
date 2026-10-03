@@ -1,6 +1,7 @@
 // End-to-End-Test „mehrere Firmen“: Betreiber legt eine Firma an, deren Administrator nimmt die
-// Einladung an, pflegt Firmendaten/Logo und lädt einen Inspekteur ein; Lizenzablauf sperrt den
-// Zugang; „Passwort vergessen“. PHP-Server mit SQLite, E-Mails landen in einer Logdatei.
+// Einladung an, pflegt Firmendaten/Logo und lädt einen Inspekteur ein; abgelaufene Lizenz = nur lesen;
+// „Passwort vergessen“; Freigabe der Online-Verträge, Selbstregistrierung mit AGB/AVV, Pro buchen,
+// AVV nachträglich annehmen. PHP-Server mit SQLite, E-Mails landen in einer Logdatei.
 // Aufruf: node tools/e2e-firmen.mjs <logo/foto.jpg> <ausgabeordner>
 import { createRequire } from 'node:module';
 import { execSync, spawn } from 'node:child_process';
@@ -133,9 +134,9 @@ await op.locator('.item', { hasText: 'Kanal Müller GmbH' }).getByRole('button',
 await op.getByText('Bearbeiten / Lizenz').click();
 await op.getByLabel('Lizenz gültig bis').fill('2020-01-31');
 await op.getByRole('button', { name: 'Speichern' }).click();
-await op.getByText('Lizenz abgelaufen').waitFor();
-const res = await mia.evaluate(async () => { const { sync } = await import('./js/sync.js'); await sync.run(); return sync.status.message; });
-if (!/31\.01\.2020 abgelaufen/.test(res)) errors.push('Abgelaufene Lizenz sperrt den Sync nicht: ' + res);
+await op.locator('.item', { hasText: 'Kanal Müller GmbH' }).getByText(/abgelaufen/).first().waitFor();
+const res = await mia.evaluate(async () => { const { sync } = await import('./js/sync.js'); await sync.run(); return { msg: sync.status.message, xml: sync.xmlErlaubt() }; });
+if (!/Nur lesen/.test(res.msg) || res.xml) errors.push('Abgelaufene Lizenz: Sync nicht nur lesend bzw. XML-Export frei: ' + JSON.stringify(res));
 await op.locator('.item', { hasText: 'Kanal Müller GmbH' }).getByRole('button', { name: 'Aktionen' }).click();
 await op.getByText('Bearbeiten / Lizenz').click();
 await op.getByRole('button', { name: 'unbefristet' }).click();
@@ -158,6 +159,70 @@ else {
   await mia.getByLabel('E-Mail oder Benutzer', { exact: true }).waitFor();
   await login(mia, 'mia@mueller.test', 'neu-pass-345');
 }
+
+step('Betreiber: Registrierung und Online-Verträge freigeben');
+await op.goto(url + '#/betrieb');
+await op.getByText(/noch nicht freigegeben/).waitFor();
+await op.getByRole('button', { name: 'Plattform & Preise' }).first().click();
+await op.getByText('Registrierung, Online-Verträge und Buchung freigeben').click();
+await op.locator('.sheet').getByRole('button', { name: 'Speichern' }).click();
+await op.getByText('Gespeichert.').waitFor();
+
+step('Neue Firma registriert sich selbst (30 Tage Test, AGB + AVV)');
+const neuF = await neu('iPhone 13', 'Registrierung');
+await neuF.goto(url + '#/pro');
+await neuF.getByText(/25\s€/).first().waitFor();
+await neuF.getByRole('button', { name: '30 Tage kostenlos testen' }).click();
+await neuF.getByLabel('Firma', { exact: true }).fill('Kanalprüfung Süd GmbH');
+await neuF.getByLabel('Anschrift der Firma').fill('Teststraße 5\n99999 Prüfstadt');
+await neuF.getByLabel('Ihr Name').fill('Paula Prüf');
+await neuF.getByLabel('Ihre Funktion').fill('Geschäftsführerin');
+await neuF.getByLabel('E-Mail-Adresse (Anmeldung)').fill('paula@kanal-sued.test');
+await neuF.getByLabel('Passwort (mind. 8 Zeichen)').fill('paula-pass-1');
+await neuF.getByLabel('Passwort wiederholen').fill('paula-pass-1');
+for (const cb of await neuF.locator('.check-row input').all()) await cb.check();
+await neuF.getByRole('button', { name: 'Firmenkonto anlegen' }).click();
+await neuF.getByText('Fast geschafft!').waitFor();
+const regLink = lastLink('registrierung');
+if (!regLink) errors.push('Keine Bestätigungs-E-Mail');
+else {
+  await neuF.goto(regLink);
+  await neuF.getByText('Willkommen bei Schachtblick Pro!').waitFor();
+  await neuF.screenshot({ path: `${outDir}/07-registriert.png`, fullPage: true });
+  if (!/Auftragsverarbeitungsvertrag nach Art\. 28 DSGVO, Fassung 1\.0/.test(readFileSync(mailLog, 'utf8'))) errors.push('Bestätigung der Vertragsannahme fehlt');
+  await neuF.getByRole('button', { name: /zu den Projekten/ }).click();
+  await neuF.getByText(/Pro-Test bis/).waitFor();
+  step('Pro buchen (jährlich)');
+  await neuF.getByRole('button', { name: 'Pro buchen' }).click();
+  await neuF.getByText('Fassung 1.0 angenommen').first().waitFor();
+  await neuF.getByRole('button', { name: 'Pro buchen' }).click();
+  await neuF.locator('.sheet').getByRole('radio', { name: 'jährlich' }).click();
+  await neuF.locator('.sheet').getByText(/250\s€ je Jahr/).waitFor();
+  await neuF.locator('.sheet .check-row input').check();
+  await neuF.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
+  await neuF.getByText(/Pro · jährlich · 3 Benutzer/).waitFor();
+  await neuF.screenshot({ path: `${outDir}/08-abo-vertraege.png`, fullPage: true });
+}
+
+step('Betreiber: Buchung in den Aufträgen');
+await op.goto(url + '#/betrieb');
+await op.getByText(/Pro jährlich/).waitFor();
+await op.getByRole('button', { name: /Aufträge \(1 offen\)/ }).click();
+await op.getByText('Buchung – Kanalprüfung Süd GmbH').waitFor();
+await op.screenshot({ path: `${outDir}/09-auftraege.png`, fullPage: true });
+await op.locator('.sheet').getByRole('button', { name: 'erledigt' }).click();
+await op.locator('.sheet').getByText('erledigt', { exact: true }).waitFor();
+
+step('Vom Betreiber angelegte Firma: AVV nachträglich annehmen');
+await chef.goto(url + '#/');
+await chef.reload();
+await chef.getByText(/Bitte bestätigen Sie die Nutzungsbedingungen/).waitFor();
+await chef.getByRole('button', { name: 'Ansehen' }).click();
+await chef.getByLabel('Ihre Funktion').fill('Geschäftsführer');
+await chef.locator('.check-row input').check();
+await chef.getByRole('button', { name: 'Verbindlich annehmen' }).click();
+if ((await chef.getByText('Fassung 1.0 angenommen').count()) < 2) await chef.getByText('Fassung 1.0 angenommen').nth(1).waitFor();
+await chef.screenshot({ path: `${outDir}/10-avv-nachtraeglich.png`, fullPage: true });
 
 await browser.close();
 writeFileSync(`${outDir}/errors.txt`, errors.join('\n'));

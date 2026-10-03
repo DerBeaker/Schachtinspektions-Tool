@@ -1,7 +1,7 @@
 // Herstellerangaben der App (erscheinen in Einstellungen, Berichten und Exportdateien).
 
 export const APP_NAME = 'Schachtblick';
-export const APP_VERSION = '0.5.5';
+export const APP_VERSION = '0.6.0';
 export const VENDOR = 'MMSE Software Engineering';
 export const VENDOR_URL = 'https://www.mmse-software.com';
 export const VENDOR_WEB = 'www.mmse-software.com';
@@ -15,3 +15,11 @@ export const DATENSCHUTZ_WEB_URL = 'https://www.mmse-software.com/datenschutz.ht
 export const VENDOR_INHABER = 'Manuel Moldan';
 export const VENDOR_ANSCHRIFT = 'Am Wingert 18, 63579 Freigericht';
 export const VENDOR_EMAIL = 'info@mmse-software.com';
+// Freiwillige Unterstützung (Spende ohne Gegenleistung)
+export const SPENDEN_URL = 'https://www.paypal.com/paypalme/derbeaker';
+// Anzeige der Preise, solange der Server keine liefert (Demo, offline); maßgeblich sind die
+// Werte im Betreiber-Bereich (Plattform-Einstellungen).
+export const PLATTFORM_STANDARD = {
+  freigegeben: false, testTage: 30, steuer: 'zzgl. gesetzlicher Umsatzsteuer',
+  preise: { monat: 25, jahr: 250, inklusive: 3, zusatzMonat: 5, zusatzJahr: 50 },
+};

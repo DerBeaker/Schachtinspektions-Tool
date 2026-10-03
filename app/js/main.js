@@ -14,6 +14,7 @@ import { renderKarte } from './views/karte.js';
 import { renderBetrieb } from './views/betrieb.js';
 import { renderEinladung, renderPasswort } from './views/zugang.js';
 import { renderDatenschutz } from './views/rechtliches.js';
+import { renderPro, renderRegistrieren, renderRegistrierung, renderKonto, renderVertrag } from './views/konto.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -40,6 +41,11 @@ async function route() {
     else if (parts[0] === 'settings') c = await renderSettings(view);
     else if (parts[0] === 'betrieb') c = await renderBetrieb(view);
     else if (parts[0] === 'datenschutz') c = await renderDatenschutz(view);
+    else if (parts[0] === 'pro') c = await renderPro(view);
+    else if (parts[0] === 'registrieren') c = await renderRegistrieren(view);
+    else if (parts[0] === 'registrierung' && parts[1]) c = await renderRegistrierung(view, parts[1]);
+    else if (parts[0] === 'konto') c = await renderKonto(view);
+    else if (parts[0] === 'agb' || parts[0] === 'avv') c = await renderVertrag(view, parts[0]);
     else if (parts[0] === 'einladung' && parts[1]) c = await renderEinladung(view, parts[1]);
     else if (parts[0] === 'passwort' && parts[1]) c = await renderPasswort(view, parts[1]);
     else return navigate('#/', { replace: true });
