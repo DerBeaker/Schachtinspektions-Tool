@@ -112,7 +112,7 @@ export function randbedingungen(manhole = {}, project = {}) {
 export function bewerteInspektion(insp, manhole = {}, project = {}) {
   const rb = randbedingungen(manhole, project);
   const zpBasis = zusatzpunkte(rb);
-  const werkstoff = manhole.schacht?.material || '';
+  const werkstoff = insp.bauteile?.aufbau?.material || insp.bauteile?.unterteil?.material || manhole.schacht?.material || '';
   const T = insp.tiefe != null && insp.tiefe !== '' ? Number(insp.tiefe) : null;
   const befunde = [];
   const offen = [];

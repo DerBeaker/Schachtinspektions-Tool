@@ -10,6 +10,7 @@ import { protokollPdf } from '../report/protokoll.js';
 import { aufmassDaten, aufmassPdf, aufmassXlsx, parseStaffel } from '../report/aufmass.js';
 import { codeLabel, fullCode } from '../data/codes.js';
 import { download } from '../core/util.js';
+import { hatBauteile } from '../isybau/bauteile.js';
 
 const bytesOf = async (blob) => new Uint8Array(await blob.arrayBuffer());
 
@@ -92,6 +93,17 @@ async function overviewJpeg(insp, maxEdge = 1400) {
   return bytesOf(await canvasToBlob(c, 'image/jpeg', 0.85));
 }
 
+/** 3D-Bild des Schachts, wenn Bauteile erfasst sind (ohne WebGL: null). */
+async function modellJpeg(manhole, inspection) {
+  const bauteile = hatBauteile(inspection.bauteile) ? inspection.bauteile : manhole.bauteile;
+  if (!hatBauteile(bauteile)) return null;
+  try {
+    const { schachtModellBild } = await import('../components/modell3d.js');
+    const blob = await schachtModellBild({ bauteile, inspection });
+    return blob ? bytesOf(blob) : null;
+  } catch { return null; }
+}
+
 async function logoJpeg(settings) {
   return settings.logo ? dataUrlBytes(settings.logo) : null;
 }
@@ -144,7 +156,7 @@ export async function protokollErzeugen({ project, items, fotos = true }) {
           if (c.photoId) photos.push({ id: c.photoId, jpeg: await photoJpeg(c.photoId).catch(() => null), caption: `Anschluss ${c.clock || ''} Uhr` });
         }
       }
-      entries.push({ manhole, inspection, overviewJpeg: await overviewJpeg(inspection).catch(() => null), photos });
+      entries.push({ manhole, inspection, overviewJpeg: await overviewJpeg(inspection).catch(() => null), modellJpeg: await modellJpeg(manhole, inspection), photos });
     }
     const bytes = protokollPdf({ project, settings, entries, logoJpeg: await logoJpeg(settings) });
     const name = items.length === 1 ? `Schachtprotokoll_${safe(items[0].manhole.name)}_${today()}.pdf` : `Inspektionsbericht_${safe(project.name)}_${today()}.pdf`;

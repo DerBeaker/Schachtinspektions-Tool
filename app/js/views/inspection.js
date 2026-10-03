@@ -20,8 +20,9 @@ import { circleFrom3, estimateDepth } from '../lib/depth.js';
 import { debounce, fmtNum, fmtM, fmtDate, clockLabel, uid, num } from '../core/util.js';
 import { navUrl } from '../lib/geo.js';
 import { runAiAnalysis, aiAvailable } from './ai.js';
+import { renderAufbau } from './aufbau.js';
 
-const TABS = [['foto', 'Foto', 'camera'], ['anschluesse', 'Anschlüsse', 'target'], ['befunde', 'Befunde', 'list'], ['daten', 'Daten', 'file']];
+const TABS = [['foto', 'Foto', 'camera'], ['anschluesse', 'Anschlüsse', 'target'], ['aufbau', 'Aufbau', 'layers'], ['befunde', 'Befunde', 'list'], ['daten', 'Daten', 'file']];
 
 export async function renderInspection(view, manholeId, params) {
   const manhole = await getManhole(manholeId);
@@ -52,7 +53,10 @@ export async function renderInspection(view, manholeId, params) {
     }),
     tabsEl, main, fab, bottom);
 
+  let tabCleanup = null;
   function renderAll() {
+    tabCleanup?.();
+    tabCleanup = null;
     const v = validateInspection(insp, { kodiersystem: project.kodiersystem });
     const counts = { anschluesse: insp.connections.length, befunde: insp.findings.length };
     const errTab = {
@@ -70,6 +74,7 @@ export async function renderInspection(view, manholeId, params) {
     if (tab === 'foto') renderFoto();
     else if (tab === 'anschluesse') renderConnections();
     else if (tab === 'befunde') renderFindings(v);
+    else if (tab === 'aufbau') tabCleanup = renderAufbau(main, { insp, manhole, changed });
     else renderData();
     renderBottom(v);
   }
@@ -509,5 +514,5 @@ export async function renderInspection(view, manholeId, params) {
   }
 
   renderAll();
-  return () => persist.flush();
+  return () => { tabCleanup?.(); persist.flush(); };
 }

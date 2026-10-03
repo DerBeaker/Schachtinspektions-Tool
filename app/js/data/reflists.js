@@ -84,11 +84,25 @@ export const REF = {
   G111: [ // anstehende Bodenart
     ['0', 'Sand, Kies'], ['1', 'Feinsand, lehmiger Sand'], ['2', 'sandiger Lehm, Löss'], ['3', 'Lehm, Ton'], ['4', 'Sonstige'],
   ],
-  G301: [ // Schachtfunktion (Auswahl)
+  G301: [ // Schachtfunktion (1–12 seit 2006, 13–22 erst ab ISYBAU 2024)
     ['1', 'Schacht'], ['2', 'Sonderschacht'], ['3', 'Kontrollschacht'], ['4', 'Drosselschacht'],
-    ['7', 'Hausrevisionsschacht'], ['10', 'Inspektionsöffnung'], ['13', 'Drainageschacht'],
-    ['15', 'Absturzschacht (Untersturz innen)'], ['16', 'Absturzschacht (Untersturz außen)'],
+    ['5', 'Lampenschacht'], ['6', 'Probenahmeschacht'], ['7', 'Hausrevisionsschacht'], ['8', 'Verbindungsschacht'],
+    ['9', 'Schacht mit Notüberlauf'], ['10', 'Inspektionsöffnung'], ['11', 'Reinigungsöffnung'], ['12', 'Probenahmeöffnung'],
+    ['13', 'Drainageschacht'], ['14', 'Kombinationsschacht'], ['15', 'Absturzschacht (Untersturz innen)'],
+    ['16', 'Absturzschacht (Untersturz außen)'], ['17', 'Absturzschacht mit Schussrinne'], ['18', 'Absturzschacht mit Kaskaden'],
+    ['19', 'Fallschacht mit Prallplatte'], ['20', 'Fallschacht mit verst. Energieumwandlung'], ['21', 'Wirbelfallschacht'],
+    ['22', 'Absetzschacht'],
   ],
+  // Bauteile des Schachts (BFR Abwasser A-7.9, gleich in ISYBAU 2006–2024)
+  G302: [['R', 'rund'], ['RV', 'rund, verschraubt'], ['E', 'rechteckig'], ['EV', 'rechteckig, verschraubt'], ['Z', 'andere Form']],
+  G303: [['1', 'mit Lüftungsöffnungen'], ['2', 'ohne Lüftungsöffnungen']],
+  G304: [['A', 'A 15'], ['B', 'B 125'], ['C', 'C 250'], ['D', 'D 400'], ['E', 'E 600'], ['F', 'F 900'], ['Z', 'sonstige/unbekannt']],
+  G305: [['R', 'rund'], ['E', 'eckig'], ['Z', 'andere Form']],
+  G306: [['1', 'Steigeisengang einläufig'], ['2', 'Steigeisengang zweiläufig'], ['3', 'Leiter'], ['4', 'Steigkästen'], ['5', 'nicht vorhanden']],
+  G307: [['1', 'Eisen'], ['2', 'verzinktes Eisen'], ['3', 'Edelstahl'], ['4', 'Aluminium'], ['5', 'kunststoffummanteltes Metall'], ['6', 'Kunststoff']],
+  G308: [['R', 'rund'], ['E', 'eckig'], ['O', 'ohne Schachtunterteil'], ['Z', 'andere Form']],
+  G309: [['0', 'Kreis bis Kämpfer'], ['1', 'Kreis bis Scheitel'], ['2', 'Rechteck bis Kämpfer'], ['3', 'Rechteck bis Scheitel'],
+    ['4', 'geschlossenes Gerinne'], ['5', 'Schussrinne'], ['6', 'Kaskade'], ['9', 'sonstige']],
 };
 
 /** Verständliche Auswahl für den vertikalen Bezugspunkt (Werte = U115). */

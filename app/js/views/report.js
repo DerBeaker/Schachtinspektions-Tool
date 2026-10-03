@@ -9,6 +9,7 @@ import { codeLabel, CODES } from '../data/codes.js';
 import { refLabel } from '../data/reflists.js';
 import { fmtDate, fmtM, fmtNum } from '../core/util.js';
 import { photoView } from '../components/photoview.js';
+import { hatBauteile, bauteileZeilen } from '../isybau/bauteile.js';
 
 export async function renderReport(view, inspectionId) {
   const insp = await getInspection(inspectionId);
@@ -17,6 +18,7 @@ export async function renderReport(view, inspectionId) {
   const settings = await getSettings();
   const names = new Map();
   const recs = buildRecords(insp, { photoName: (id) => { if (!names.has(id)) names.set(id, `Foto ${names.size + 1}`); return names.get(id); } });
+  const bauteile = hatBauteile(insp.bauteile) ? bauteileZeilen(insp.bauteile) : hatBauteile(manhole?.bauteile) ? bauteileZeilen(manhole.bauteile) : [];
   const bew = bewerteInspektion(insp, manhole, project);
   const klById = new Map(bew.befunde.map((e) => [e.id, e.klassen]));
 
@@ -53,6 +55,8 @@ export async function renderReport(view, inspectionId) {
           return h('tr', null, h('td', c.dir === 'out' ? 'Ablauf' : c.dir === 'closed' ? 'verschlossen' : 'Zulauf'), h('td', c.clock || '–'), h('td', c.dn || '–'),
             h('td', dep != null && dep !== '' ? `${fmtNum(dep)} m` : '–'), h('td', c.pipeName || c.kommentar || ''));
         })))),
+    bauteile.length ? h('section', null, h('h3', { style: { margin: '14px 0 6px' } }, 'Schachtaufbau (Bauteile)'),
+      h('table', null, h('tbody', null, bauteile.map(([k, t]) => h('tr', null, h('th', { style: { width: '24%' } }, k), h('td', t)))))) : null,
     h('section', null, h('h3', { style: { margin: '14px 0 6px' } }, 'Zustandsdaten (ISYBAU-Datensätze)'),
       h('table', null, h('thead', null, h('tr', null, h('th', 'Nr.'), h('th', insp.bezugVertikal === '2' ? 'Lage ab Deckel [m]' : 'Lage ab Sohle [m]'), h('th', 'Kode'), h('th', 'Beschreibung'), h('th', 'Quant.'), h('th', 'Uhr'), h('th', 'Ber.'), h('th', 'Klassen'), h('th', 'Anmerkung / Foto'))),
         h('tbody', null, recs.map((r) => h('tr', null,

@@ -288,6 +288,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .issue { display: flex; gap: 8px; align-items: flex-start; font-size: .88rem; padding: 8px 10px; border-radius: 10px; }
 .issue.error { background: var(--danger-soft); color: var(--danger); }
 .issue.warn { background: var(--warn-soft); color: var(--warn); }
+.issue.ok { background: var(--ok-soft); color: var(--ok); }
 .issue .icon { margin-top: 1px; }
 
 .code-list { display: flex; flex-direction: column; gap: 6px; }
@@ -379,3 +380,12 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .about-logo { width: 120px; height: auto; border-radius: 8px; background: #fff; padding: 4px; }
 .vendor-line { text-align: center; padding: 18px 16px 28px; }
 .vendor-line a { color: inherit; }
+
+/* 3D-Schachtmodell */
+.modell3d { position: relative; height: 320px; border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 35%, var(--surface-2), var(--bg)); }
+.modell3d canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.modell3d-gross { height: min(72vh, 720px); }
+.modell3d-hint { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px; }
+.legend3d { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .78rem; color: var(--muted); }
+.legend3d .lg { display: inline-flex; align-items: center; gap: 5px; }
+.legend3d i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; box-shadow: 0 0 0 1px #0002; }

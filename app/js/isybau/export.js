@@ -5,6 +5,7 @@ import { buildRecords, KZUSTAND_ORDER } from './model.js';
 import { bewerteInspektion, ZIELE } from './bewertung.js';
 
 import { APP_NAME, APP_VERSION, VENDOR } from '../brand.js';
+import { hatBauteile, schachtXml } from './bauteile.js';
 
 export { APP_NAME, APP_VERSION };
 
@@ -105,7 +106,43 @@ function bewertungXml(b, today) {
   ];
 }
 
-export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date(), bewertung = true }) {
+/** Stammdaten je Schacht mit Bauteilbeschreibung (nur Schächte mit Bauteilen oder Tiefe). */
+function stammAnlagen(items, version) {
+  return items.map(({ inspection: insp, manhole }) => {
+    const bt = insp.bauteile || manhole.bauteile;
+    if (!hatBauteile(bt)) return null;
+    const { schacht, abdeckungen } = schachtXml(bt, {
+      version,
+      tiefe: insp.tiefe ?? manhole.tiefe,
+      innenschutz: insp.innenschutz,
+      anzahlAnschluesse: (insp.connections || []).length || null,
+    });
+    return ['AbwassertechnischeAnlage', [
+      ['Objektbezeichnung', manhole.name],
+      ['Objektart', '2'],
+      ['Baujahr', /^\d{4}$/.test(manhole.baujahr || '') ? manhole.baujahr : null],
+      ['Entwaesserungsart', ['KR', 'KS', 'KM', 'KW', 'DR', 'DS', 'DM'].includes(manhole.entwaesserungsart) ? manhole.entwaesserungsart : null],
+      ['Knoten', [
+        ['KnotenTyp', '0'],
+        ['Schacht', schacht],
+        abdeckungen ? ['Abdeckungen', abdeckungen] : null,
+      ]],
+      ['Lage', [
+        ['Strassenschluessel', /^\d{1,5}$/.test(manhole.strassenschluessel || '') ? manhole.strassenschluessel : null],
+        ['Strassenname', manhole.strasse || null],
+        ['Ortsteilschluessel', /^\d{1,5}$/.test(manhole.ortsteilschluessel || '') ? manhole.ortsteilschluessel : null],
+        ['Ortsteilname', manhole.ortsteil || null],
+      ]],
+    ]];
+  }).filter(Boolean);
+}
+
+/**
+ * ISYBAU-Zustandsdaten. Mit `stammdaten` (Standard) kommt ein Stammdatenkollektiv mit der
+ * Bauteilbeschreibung der Schächte (Abdeckung, Auflageringe, Aufbau/Konus, Unterteil, Gerinne,
+ * Steighilfen) dazu – das verlangen manche Auftraggeber zusätzlich zur Inspektion.
+ */
+export function exportZustandsdaten({ project, items, settings = {}, version = '2017-07', today = new Date(), bewertung = true, stammdaten = true }) {
   const profile = ISYBAU_VERSIONS[version];
   if (!profile) throw new Error(`Unbekannte ISYBAU-Version ${version}`);
   const isoDate = (d) => d.toISOString().slice(0, 10);
@@ -182,19 +219,36 @@ export function exportZustandsdaten({ project, items, settings = {}, version = '
 
   const eig = [['Inspektion', '1'], ['Dichtheit', '0'], ['Film', '0']];
   if (profile.profilmass) eig.push(['Profilmasserfassung', '0']);
+  const stamm = stammdaten ? stammAnlagen(items, version) : [];
+  const stammEig = [['Stammdatentyp', '1'], ['Bautechnik', '1'], ['Geometrie', '0'], ['Sanierung', '0'], ['Umfeld', '0']];
+  if (version >= '2024') stammEig.push(['Einleitung', '0'], ['GeoPunktObjekt', '0']);
 
   const body = [
     ['Datenkollektive', [
       ['Datenstatus', '1'],
       ['Erstellungsdatum', isoDate(today)],
       ['Kommentar', `Schachtinspektionen – erstellt mit ${APP_NAME} ${APP_VERSION} (${VENDOR})`],
-      ['Kennungen', [['Kollektiv', [
-        ['Kennung', kennung],
-        ['Kollektivart', '2'],
-        ['Kollektiveigenschaft', [['Zustandsdaten', eig]]],
-        ['Regelwerk', profile.regelwerk],
-        ['Bearbeitungsstand', isoDate(today)],
-      ]]]],
+      ['Kennungen', [
+        stamm.length ? ['Kollektiv', [
+          ['Kennung', 'STA01'],
+          ['Kollektivart', '1'],
+          ['Kollektiveigenschaft', [['Stammdaten', stammEig]]],
+          ['Regelwerk', profile.regelwerk],
+          ['Bearbeitungsstand', isoDate(today)],
+        ]] : null,
+        ['Kollektiv', [
+          ['Kennung', kennung],
+          ['Kollektivart', '2'],
+          ['Kollektiveigenschaft', [['Zustandsdaten', eig]]],
+          ['Regelwerk', profile.regelwerk],
+          ['Bearbeitungsstand', isoDate(today)],
+        ]],
+      ]],
+      stamm.length ? ['Stammdatenkollektiv', [
+        ['Kennung', 'STA01'],
+        ['Beschreibung', `Bauteilbeschreibung der Schächte ${project.name || ''}`.trim().slice(0, 100)],
+        ...stamm,
+      ]] : null,
       ['Zustandsdatenkollektiv', [
         ['Kennung', kennung],
         ['Beschreibung', `Schachtinspektionen ${project.name || ''}`.trim().slice(0, 100)],

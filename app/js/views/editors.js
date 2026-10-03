@@ -106,7 +106,7 @@ export function openFindingEditor({ insp, project, manhole, finding, onSave, onD
 
     const refresh = () => {
       clear(issues, issuesBox(validateFinding(f, insp, { kodiersystem: project.kodiersystem })));
-      const kl = klassifiziereBefund(f, { werkstoff: manhole?.schacht?.material });
+      const kl = klassifiziereBefund(f, { werkstoff: insp.bauteile?.aufbau?.material || insp.bauteile?.unterteil?.material || manhole?.schacht?.material });
       clear(klassenEl, kl.klassifizierbar ? h('div', { class: 'row wrap', style: { gap: '8px' } },
         h('span', { class: 'muted small' }, 'Zustandsklassen (BFR):'),
         befundKlassen(kl, { leer: h('span', { class: 'muted small' }, kl.fehlt || 'keine Einordnung') }),

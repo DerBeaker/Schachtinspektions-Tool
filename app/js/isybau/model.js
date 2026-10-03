@@ -1,5 +1,6 @@
 // Fachmodell einer Schachtinspektion und Umwandlung in ISYBAU-Zustandsdatensätze (KZustand).
 
+import { normBauteile } from './bauteile.js';
 import { CODES } from '../data/codes.js';
 
 export const round2 = (v) => Math.round(v * 100) / 100;
@@ -26,6 +27,8 @@ export function newInspection({ id, project, manhole, inspector, now = new Date(
     tiefe: manhole.tiefe ?? null,
     tiefeQuelle: manhole.tiefe != null ? 'stamm' : '',
     innenschutz: manhole.schacht?.innenschutz || '',
+    // Bauteilbeschreibung (Abdeckung, Konus, Ringe, Unterteil, Gerinne …), vorbelegt aus den Stammdaten
+    bauteile: manhole.bauteile ? normBauteile(manhole.bauteile) : null,
     artAuskleidung: '',
     bemerkung: '',
     overview: { photoId: null, clock: { cx: 0.5, cy: 0.5, r: 0.36, rot: 0 } },

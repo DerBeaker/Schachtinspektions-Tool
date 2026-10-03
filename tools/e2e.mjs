@@ -10,7 +10,8 @@ const { chromium, devices } = require(require.resolve('playwright', { paths: [ex
 const [url = 'http://127.0.0.1:8080/', photo, outDir = '.e2e'] = process.argv.slice(2);
 mkdirSync(outDir, { recursive: true });
 const errors = [];
-const browser = await chromium.launch();
+// WebGL (3D-Modell) im Headless-Browser über SwiftShader
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await browser.newContext({ ...devices['iPhone 13'], acceptDownloads: true, locale: 'de-DE' });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -54,6 +55,26 @@ await shot('06-foto-mit-anschluessen');
 step('Anschlüsse');
 await page.getByRole('tab', { name: /Anschlüsse/ }).click();
 await shot('07-anschluesse');
+
+step('Aufbau: Bauteile und 3D-Modell');
+await page.getByRole('tab', { name: /Aufbau/ }).click();
+await page.locator('.modell3d canvas, .modell3d-hint').first().waitFor();
+await page.getByRole('button', { name: 'Vorlage Regelschacht DN 1000' }).click();
+{
+  const ersetzen = page.getByRole('button', { name: 'Ersetzen' });
+  if (await ersetzen.isVisible().catch(() => false)) await ersetzen.click();
+}
+await page.getByLabel('Gesamthöhe').fill('12 cm');
+await page.getByLabel('Höhe inkl. Konus').fill('1,55');
+{
+  const ut = page.locator('.card', { hasText: 'Unterteil und Gerinne' }).getByLabel('Höhe');
+  await ut.fill('600 mm');
+  await ut.press('Enter');
+}
+await page.getByText(/Passt: 0,15 m/).waitFor();
+if (!(await page.locator('.modell3d canvas').count())) errors.push('3D-Modell nicht dargestellt (WebGL)');
+await page.waitForTimeout(800);
+await shot('07b-aufbau');
 
 step('Befund DAB erfassen');
 await page.getByRole('tab', { name: /Befunde/ }).click();
@@ -149,6 +170,7 @@ async function exportAs(format) {
   expect(/<Fotodatei>S1005-001\.jpg<\/Fotodatei>/, 'Fotoreferenz fehlt');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
   expect(/<VertikaleLage>1\.92<\/VertikaleLage>\s*<InspektionsKode>DAQ</, 'DAQ-Ende per Laser 500 mm ab Deckel -> 1,92 m');
+  expect(/<Stammdatenkollektiv>[\s\S]*<HoeheAuflageringe>12<\/HoeheAuflageringe>[\s\S]*<HoeheAufbau>1\.55<\/HoeheAufbau>[\s\S]*<HoeheUnterteil>0\.60<\/HoeheUnterteil>/, 'Bauteilbeschreibung (Stammdaten) fehlt');
 }
 {
   const z = await exportAs('2006-10');
@@ -163,6 +185,7 @@ async function exportAs(format) {
   expect(/<KZ001>1\.52<\/KZ001>\s*<KZ002>DAB<\/KZ002>\s*<KZ014>B<\/KZ014>\s*<KZ015>A<\/KZ015>\s*<KZ003>0\.8<\/KZ003>/, 'DAB (ISYBAU-Schlüssel, Dezimalpunkt) fehlt');
   expect(/<KI101>1<\/KI101>/, 'Höhenangabe von unten (KI101 = 1) fehlt');
   expect(/<KZ005>A1<\/KZ005>/, 'Streckenschaden A1 fehlt');
+  expect(/<KG314>625<\/KG314>[\s\S]*<KG323>2<\/KG323>/, 'Bauteile (Deckel, Steighilfen) in KG fehlen');
   expect(/Fotos\/S1005-001\.jpg/, 'Foto im ZIP fehlt');
 }
 

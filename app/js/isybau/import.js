@@ -7,6 +7,7 @@ import { parseXml, decodeXmlBytes, child, children, text, num, findAll } from '.
 import { bearing, bearingToClock } from '../lib/geo.js';
 import { parseM150, isM150Root } from './m150.js';
 import { parseIsybauZustand, parseM150Zustand } from './vorinspektion.js';
+import { bauteileAusIsybau } from './bauteile.js';
 
 const r3 = (v) => (v == null ? null : Math.round(v * 1000) / 1000);
 const r2 = (v) => (v == null ? null : Math.round(v * 100) / 100);
@@ -160,6 +161,7 @@ export function assembleManholes(nodes, edges, warnings = []) {
       tiefe,
       schacht: n.schacht,
       deckel: n.deckel,
+      bauteile: n.bauteile || null,
       extra: n.extra || null,
       umwelt: n.umwelt || null,
       pipes,
@@ -297,6 +299,7 @@ export function importStammdaten(input) {
           unterteilMaterial: text(schacht, 'Unterteil/MaterialUnterteil'),
           gerinneform: text(schacht, 'Unterteil/Gerinneform'),
         } : null,
+        bauteile: bauteileAusIsybau(schacht, deckel),
         deckel: deckel ? {
           form: text(deckel, 'Deckelform'),
           klasse: text(deckel, 'Abdeckungsklasse'),

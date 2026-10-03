@@ -12,6 +12,7 @@ import { APP_NAME, APP_VERSION, VENDOR, VENDOR_WEB } from '../brand.js';
 import { CODES } from '../data/codes.js';
 import { detectCrs } from '../lib/geo.js';
 import { REF } from '../data/reflists.js';
+import { bauteileAusM150, bauteileM150 } from './bauteile.js';
 
 // ---- Import -----------------------------------------------------------------
 
@@ -116,6 +117,7 @@ export function parseM150(root) {
         unterteilForm: text(kg, 'KG307'),
         unterteilDn: lenToM(numDe(kg, 'KG308')),
       },
+      bauteile: bauteileAusM150((f) => text(kg, f).trim(), (f) => lenToM(numDe(kg, f))),
       deckel: text(kg, 'KG310') || text(kg, 'KG312') ? {
         form: text(kg, 'KG310'),
         klasse: text(kg, 'KG312'),
@@ -198,6 +200,7 @@ const RT_TEXT = Object.fromEntries(Object.entries({
   '118': 'E=Rechteckig|Q=Quadratisch|R=Rund|Z=Sonstige',
   '119': '0=nicht bekannt|A=Klasse A|B=Klasse B|C=Klasse C|D=Klasse D|E=Klasse E|F=Klasse F|Z=Sonstige',
   '120': 'A=Beschichtung werkseitig|B=Auskleidung werkseitig|C=Teil/-Vollauskleidung Laminattechnik|D=Beschichtung vor Ort|E=Teil/-Vollauskleidung vor Ort|Z=Sonstige',
+  '122': '1=Eisen|2=Verzinktes Eisen|3=Nichtrostender Stahl|4=Aluminium|5=Kunststoffummanteltes Metall|6=Kunststoff',
   '121': 'ML=Mobiles System|SE1=Steigeisen einläufig|SE2=Steigeisen zweiläufig|SL=Steigleiter|Z=Sonstige',
   '123': 'N=Messtechnik nicht vorhanden|J=Messtechnik vorhanden',
   '124': 'A=Abdeckung und Rahmen|B=Auflagerringe|C=Schachtaufbau|D=Konus|E=Übergangsplatte|F=untere Schachtzone|G=Podest|H=Auftritt|I=Gerinne|J=Sohle',
@@ -219,8 +222,8 @@ const RT_TEXT = Object.fromEntries(Object.entries({
 /** Feld -> Referenztabelle (Felddefinitionen DWA-M 150). */
 const RT_OF = {
   KG101: '001', KG103: '002', KG106: '004', KG301: '103', KG302: '104', KG304: '105', KG305: '116', KG306: '117',
-  KG307: '118', KG310: '118', KG311: '105', KG312: '119', KG316: '118', KG317: '105', KG320: '105', KG321: '120',
-  KG322: '105', KG323: '121', KG326: '123', KG401: '109', KG404: '112', KG407: '115',
+  KG307: '118', KG310: '118', KG311: '105', KG312: '119', KG317: '105', KG320: '105', KG321: '120',
+  KG322: '105', KG323: '121', KG325: '122', KG326: '123', KG401: '109', KG404: '112', KG407: '115',
   GO002: '300', GO003: '301', GP002: '302', GP010: '303',
   KI004: '201', KI005: '202', KI007: '215', KI101: '210', KI102: '211', KI103: '203', KI106: '204', KI107: '205',
   KI109: '206', KI117: '208',
@@ -254,6 +257,7 @@ export const M150_VARIANTEN = [
 
 const VARIANTS = {
   dwa: {
+    name: 'dwa',
     sep: ',',
     date: deDate,
     ki: (insp, project, hasPhotos) => ({
@@ -271,6 +275,7 @@ const VARIANTS = {
     rt: RT_TEXT,
   },
   isybau: {
+    name: 'isybau',
     sep: '.',
     date: isoDate,
     ki: (insp, project) => ({
@@ -284,10 +289,15 @@ const VARIANTS = {
       KI109: insp.wasserhaltung || '1',
       KI117: null,
     }),
-    kg306: (m) => m.schacht?.funktion || '1',
+    kg306: (m, insp) => insp?.bauteile?.funktion || m.schacht?.funktion || '1',
     rt: {
       ...RT_TEXT,
       '117': refTexts(REF.G301),
+      '118': { ...refTexts(REF.G302), ...refTexts(REF.G305), O: 'ohne Schachtunterteil' },
+      '119': refTexts(REF.G304),
+      '120': refTexts(REF.G103),
+      '121': refTexts(REF.G306),
+      '122': refTexts(REF.G307),
       '201': refTexts(REF.U101),
       '203': refTexts(REF.U108),
       '204': refTexts(REF.U106),
@@ -361,8 +371,10 @@ function kgFields(manhole, insp, V) {
     KG104: manhole.ortsteil || null,
     KG302: nutzung,
     KG305: 'S',
-    KG306: V.kg306(manhole),
+    KG306: V.kg306(manhole, insp),
     ...raw,
+    // Bauteilbeschreibung aus der Inspektion (überschreibt importierte Werte)
+    ...bauteileM150(insp.bauteile || manhole.bauteile, { variante: V.name, innenschutz: insp.innenschutz }),
   };
   delete f.KG001;
   if (tiefe != null) f.KG211 = fmtNum(V.sep)(tiefe, 2);

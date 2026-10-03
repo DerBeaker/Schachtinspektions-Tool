@@ -8,11 +8,12 @@ export function uid() {
 }
 
 const UNIT_TO_M = { mm: 0.001, cm: 0.01, m: 1, ft: 0.3048, "'": 0.3048, in: 0.0254, '"': 0.0254 };
+const UNIT_FACTOR = { m: 1, cm: 0.01, mm: 0.001 };
 
 /**
  * Zahl aus Tastatur oder Laser-Entfernungsmesser (Bluetooth im Tastaturmodus) lesen:
- * „2,345“, „2.345 m“, „2345mm“, „234,5 cm“. Mit Einheit wird in `unit` ('m' oder 'mm')
- * umgerechnet. Liefert den Wert als String mit Punkt, '' für leer, null für ungültig.
+ * „2,345“, „2.345 m“, „2345mm“, „234,5 cm“. Mit Einheit wird in `unit`
+ * umgerechnet ('m', 'cm' oder 'mm'). Liefert den Wert als String mit Punkt, '' für leer, null für ungültig.
  */
 export function parseMeasure(raw, unit) {
   const s = String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '');
@@ -25,7 +26,7 @@ export function parseMeasure(raw, unit) {
   if (last >= 0) n = n.slice(0, last).replace(/[.,]/g, '') + '.' + n.slice(last + 1);
   let v = Number(n);
   if (!Number.isFinite(v)) return null;
-  if (m[2] && (unit === 'm' || unit === 'mm')) v = v * UNIT_TO_M[m[2]] * (unit === 'mm' ? 1000 : 1);
+  if (m[2] && UNIT_FACTOR[unit]) v = (v * UNIT_TO_M[m[2]]) / UNIT_FACTOR[unit];
   return String(Math.round(v * 1000) / 1000);
 }
 

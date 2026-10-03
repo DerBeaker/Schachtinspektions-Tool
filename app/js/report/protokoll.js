@@ -7,6 +7,7 @@ import { buildRecords } from '../isybau/model.js';
 import { bewerteInspektion, klassenKurz, OBJEKTKLASSEN } from '../isybau/bewertung.js';
 import { CODES, codeLabel } from '../data/codes.js';
 import { refLabel } from '../data/reflists.js';
+import { hatBauteile, bauteileZeilen, hoehenbilanz } from '../isybau/bauteile.js';
 import { APP_NAME, CREATED_WITH } from '../brand.js';
 
 const M = 40; // Seitenrand
@@ -114,7 +115,10 @@ function klassenKachel(page, x, y, k, text, { s = 34, size = 8.5 } = {}) {
 }
 
 /** Ein Schacht (beginnt auf neuer Seite). */
-function schacht(L, { project, settings, manhole, inspection: insp, overview, photos = [], optionen }) {
+function schacht(L, { project, settings, manhole, inspection: insp, overview, modell, photos = [], optionen }) {
+  const bt = hatBauteile(insp.bauteile) ? insp.bauteile : hatBauteile(manhole.bauteile) ? manhole.bauteile : null;
+  const dn = bt?.aufbau?.laenge || bt?.unterteil?.laenge || manhole.schacht?.dn;
+  const werkstoff = bt?.aufbau?.material || bt?.unterteil?.material || manhole.schacht?.material;
   const names = new Map();
   const photoName = (id) => { if (!names.has(id)) names.set(id, `Foto ${names.size + 1}`); return names.get(id); };
   const recs = buildRecords(insp, { photoName });
@@ -140,7 +144,7 @@ function schacht(L, { project, settings, manhole, inspection: insp, overview, ph
     ['Auftrag', [project.auftragBezeichnung, project.auftragNummer].filter(Boolean).join(' · ') || '–'],
     ['Lage', manhole.x != null ? `${fmt(manhole.x, 2)} / ${fmt(manhole.y, 2)}` : '–'],
     ['Deckel-/Sohlhöhe', manhole.deckelhoehe != null || manhole.sohlhoehe != null ? `${fmt(manhole.deckelhoehe, 3)} / ${fmt(manhole.sohlhoehe, 3)} m` : '–'],
-    ['Schacht', [manhole.schacht?.dn ? `DN ${Math.round(manhole.schacht.dn * 1000)}` : null, manhole.schacht?.material ? refLabel('G102', manhole.schacht.material) : null].filter(Boolean).join(', ') || '–'],
+    ['Schacht', [dn ? `DN ${Math.round(dn * 1000)}` : null, werkstoff ? refLabel('G102', werkstoff) : null].filter(Boolean).join(', ') || '–'],
     ['Datum / Uhrzeit', `${fmtDate(insp.datum)} ${insp.uhrzeit || ''}`.trim()],
     ['Inspekteur', insp.inspekteur || '–'],
     ['Schachttiefe', insp.tiefe != null && insp.tiefe !== '' ? `${fmt(insp.tiefe)} m${insp.tiefeQuelle === 'foto' ? ' (geschätzt)' : ''}` : '–'],
@@ -186,6 +190,38 @@ function schacht(L, { project, settings, manhole, inspection: insp, overview, ph
     } else {
       L.y = top + fotoH;
     }
+  }
+
+  // Bauteilbeschreibung mit 3D-Modell
+  const zeilen = bt ? bauteileZeilen(bt) : [];
+  if (zeilen.length) {
+    abschnitt(L, 'Schachtaufbau (Bauteile)', modell ? 190 : 24 + zeilen.length * 13);
+    const top = L.y;
+    let bildH = 0;
+    const x0 = modell ? M + 186 : M;
+    const w0 = modell ? CW - 186 : CW;
+    if (modell) {
+      const s = Math.min(172 / modell.width, 172 / modell.height);
+      L.page.image(modell, M, top, modell.width * s, modell.height * s);
+      L.page.text('3D-Modell aus der Bauteilbeschreibung', M, top + modell.height * s + 3, { size: 6.8, color: GREY });
+      bildH = modell.height * s + 14;
+    }
+    let y = top;
+    zeilen.forEach(([k, t], i) => {
+      const n = wrapText(t, 7.6, w0 - 104).length;
+      const hRow = Math.max(12, n * 7.6 * 1.3 + 4);
+      if (i % 2 === 0) L.page.rect(x0, y, w0, hRow, { fill: ROW });
+      L.page.text(k, x0 + 3, y + 2.5, { size: 7.6, bold: true, color: '#26364d' });
+      L.page.paragraph(t, x0 + 100, y + 2.5, w0 - 104, { size: 7.6 });
+      y += hRow;
+    });
+    const hb = hoehenbilanz(bt, insp.tiefe);
+    if (hb.vollstaendig && hb.rest != null) {
+      L.page.paragraph(`Höhenbilanz: Bauteile ${fmt(hb.summe)} m + Abdeckung/Rahmen ${fmt(hb.rest)} m = Schachttiefe ${fmt(insp.tiefe)} m`
+        + (hb.ok ? '' : ' – Abweichung prüfen'), x0 + 3, y + 4, w0 - 6, { size: 7, color: GREY });
+      y += 16;
+    }
+    L.y = Math.max(top + bildH, y + 6);
   }
 
   // Zustandsdaten
@@ -303,7 +339,7 @@ function uebersicht(L, { project, entries, optionen }) {
  * @param {object} p
  * @param {object} p.project
  * @param {object} p.settings   {company, companyAddress, companyContact}
- * @param {Array}  p.entries    [{manhole, inspection, overviewJpeg?, photos?: [{id, jpeg, caption}]}]
+ * @param {Array}  p.entries    [{manhole, inspection, overviewJpeg?, modellJpeg?, photos?: [{id, jpeg, caption}]}]
  * @param {Uint8Array} [p.logoJpeg]
  * @param {object} [p.optionen] {klassen: true, uebersicht: auto}
  * @returns {Uint8Array}
@@ -322,8 +358,9 @@ export function protokollPdf({ project, settings = {}, entries, logoJpeg = null,
   if (opt.uebersicht) uebersicht(L, { project, entries, optionen: opt });
   for (const e of entries) {
     const overview = e.overviewJpeg ? doc.addJpeg(e.overviewJpeg) : null;
+    const modell = e.modellJpeg ? doc.addJpeg(e.modellJpeg) : null;
     const photos = (e.photos || []).map((f) => ({ ...f, image: f.jpeg ? doc.addJpeg(f.jpeg) : null }));
-    schacht(L, { project, settings, manhole: e.manhole, inspection: e.inspection, overview, photos, optionen: opt });
+    schacht(L, { project, settings, manhole: e.manhole, inspection: e.inspection, overview, modell, photos, optionen: opt });
   }
   const heute = new Date().toLocaleDateString('de-DE');
   doc.pages.forEach((p, i) => fuss(p, i + 1, doc.pages.length, heute));
