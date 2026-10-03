@@ -224,6 +224,7 @@ export const sync = {
 
   users() { return this.request('users'); },
   saveUser(u) { return this.request('users', { method: 'POST', body: u }); },
+  deleteUser(id) { return this.request('user-delete', { method: 'POST', body: { id } }); },
   invite(d) { return this.request('invite', { method: 'POST', body: d }); },
   invites() { return this.request('invites'); },
   revokeInvite(id) { return this.request('invite-revoke', { method: 'POST', body: { id } }); },

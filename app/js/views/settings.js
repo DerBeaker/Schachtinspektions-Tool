@@ -9,6 +9,7 @@ import { BEZUG_VERTIKAL } from '../data/reflists.js';
 import { APP_NAME, APP_VERSION, VENDOR, VENDOR_URL, VENDOR_WEB, VENDOR_TAGLINE } from '../brand.js';
 import { pickFile } from '../lib/image.js';
 import { debounce, fmtDate } from '../core/util.js';
+import { rechtsLinks } from './rechtliches.js';
 
 export function lizenzText(l) {
   const teile = [];
@@ -140,9 +141,14 @@ export async function renderSettings(view) {
           field(x ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 8 Zeichen)', input('', (v) => { d.password = v; }, { type: 'password', autocomplete: 'new-password' })),
           field('Rolle', select(d.role, [['inspector', 'Inspekteur'], ['admin', 'Administrator']], (v) => { d.role = v; })),
           x ? toggle(d.active, (v) => { d.active = v; }, 'aktiv') : null),
-        actions: [btn('Speichern', { variant: 'primary', onClick: async () => {
-          try { await sync.saveUser(d); toast('Gespeichert.', 'ok'); s2.close(); load(); } catch (e) { toast(e.message, 'error', 5000); }
-        } })],
+        actions: [
+          x && x.id !== sync.auth?.user?.id ? btn('Löschen', { icon: 'trash', variant: 'ghost', onClick: async () => {
+            if (!(await confirmDialog(`Zugang von ${x.name} endgültig löschen? Erfasste Inspektionen bleiben erhalten.`, { ok: 'Löschen', danger: true }))) return;
+            try { await sync.deleteUser(x.id); toast('Benutzer gelöscht.'); s2.close(); load(); } catch (e) { toast(e.message, 'error', 5000); }
+          } }) : null,
+          btn('Speichern', { variant: 'primary', onClick: async () => {
+            try { await sync.saveUser(d); toast('Gespeichert.', 'ok'); s2.close(); load(); } catch (e) { toast(e.message, 'error', 5000); }
+          } })],
       });
     };
     sheet({ title: 'Benutzer', wide: true, body: h('div', { class: 'stack' }, lizEl, listEl,
@@ -232,7 +238,9 @@ export async function renderSettings(view) {
           s.theme = v; save();
           if (v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
         })),
-        toggle(s.ai !== false, set('ai'), 'KI-Assistent anbieten (wenn der Server ihn unterstützt)'))),
+        toggle(s.ai !== false, set('ai'), 'KI-Assistent anbieten (wenn der Server ihn unterstützt)'),
+        toggle(s.kartenErlaubt === true, set('kartenErlaubt'), 'Kartenhintergrund ohne Nachfrage laden'),
+        h('p', { class: 'muted small' }, 'Die Kartenkacheln kommen von basemap.de (BKG) bzw. OpenStreetMap; dabei wird die IP-Adresse an den Dienst übertragen. Ausgeschaltet fragt die Karte jedes Mal nach. ', h('a', { href: '#/datenschutz' }, 'Datenschutzhinweise')))),
     h('div', { class: 'stack' },
       serverBox,
       h('div', { class: 'card card-pad stack-sm' },
@@ -254,7 +262,8 @@ export async function renderSettings(view) {
             h('a', { class: 'small', href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB))),
         h('p', { class: 'muted small' }, 'Kodiersystem: DIN EN 13508-2:2011 mit nationaler Festlegung nach BFR Abwasser (ISYBAU, Stand 01/2025) bzw. DWA-M 149-2. Austauschformate: ISYBAU XML-2006, -2013, -2017, -2024 und DWA-M 150.'),
         h('p', { class: 'muted small' }, 'Die Kodierung bleibt fachliche Verantwortung des Inspekteurs. KI-Vorschläge und Foto-Tiefenschätzungen sind Hilfsmittel und ersetzen keine Prüfung bzw. kein Aufmaß.'),
-        h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · Kartendaten © basemap.de / BKG, © OpenStreetMap-Mitwirkende · Leaflet (BSD-2-Clause)`)))));
+        h('p', { class: 'muted small' }, `© ${new Date().getFullYear()} ${VENDOR} · `, rechtsLinks()),
+        h('p', { class: 'muted small' }, 'Kartendaten © basemap.de / BKG, © OpenStreetMap-Mitwirkende · Leaflet (BSD-2-Clause) · three.js (MIT)')))));
   renderServer();
   const info = await storageInfo();
   storageEl.textContent = info ? `${(info.used / 1048576).toFixed(1)} MB belegt von ca. ${(info.quota / 1073741824).toFixed(1)} GB verfügbar` : 'Speicherinfo nicht verfügbar.';

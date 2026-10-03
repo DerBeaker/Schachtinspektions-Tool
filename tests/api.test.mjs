@@ -252,6 +252,16 @@ test('Mehrere Firmen: Betreiber, Einladung, Lizenz, Firmendaten, Passwort verges
   r = await api('op-tenant', { method: 'POST', token: op, body: { id: r.data.id ?? 1, name: 'Kanal Test GmbH', active: false } });
   assert.equal(r.status, 400); // eigene Firma nicht sperrbar
 
+  // Admin löscht einen Benutzer seiner Firma (nicht sich selbst, nicht fremde Firmen)
+  r = await api('users', { token: op });
+  const erika = r.data.users.find((x) => x.username === 'erika');
+  assert.equal((await api('user-delete', { method: 'POST', token: chef, body: { id: erika.id } })).status, 403); // gesperrte Firma
+  r = await api('users', { token: op });
+  const self = r.data.users.find((x) => x.username === 'admin');
+  assert.equal((await api('user-delete', { method: 'POST', token: op, body: { id: self.id } })).status, 400);
+  assert.equal((await api('user-delete', { method: 'POST', token: op, body: { id: erika.id } })).status, 200);
+  assert.equal((await login('erika', 'sicher-1234')).status, 403);
+
   // Export und Löschen einer Firma
   r = await api('op-export', { token: op, query: `&tenant=${firmaId}` });
   assert.equal(r.status, 200);

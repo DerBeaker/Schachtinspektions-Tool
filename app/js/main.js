@@ -13,6 +13,7 @@ import { renderReport } from './views/report.js';
 import { renderKarte } from './views/karte.js';
 import { renderBetrieb } from './views/betrieb.js';
 import { renderEinladung, renderPasswort } from './views/zugang.js';
+import { renderDatenschutz } from './views/rechtliches.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -38,6 +39,7 @@ async function route() {
     else if (parts[0] === 'r') c = await renderReport(view, parts[1]);
     else if (parts[0] === 'settings') c = await renderSettings(view);
     else if (parts[0] === 'betrieb') c = await renderBetrieb(view);
+    else if (parts[0] === 'datenschutz') c = await renderDatenschutz(view);
     else if (parts[0] === 'einladung' && parts[1]) c = await renderEinladung(view, parts[1]);
     else if (parts[0] === 'passwort' && parts[1]) c = await renderPasswort(view, parts[1]);
     else return navigate('#/', { replace: true });

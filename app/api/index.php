@@ -102,6 +102,9 @@ switch ("$method $route") {
     case 'POST users':
         handle_user_save(sb_user());
 
+    case 'POST user-delete':
+        handle_user_delete(sb_user());
+
     case 'POST password':
         handle_password(sb_user());
 

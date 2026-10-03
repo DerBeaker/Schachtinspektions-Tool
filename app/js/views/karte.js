@@ -4,7 +4,7 @@
 
 import { h, clear, btn, icon, toast, segmented, empty } from '../core/ui.js';
 import { navigate, topbar } from '../core/shell.js';
-import { getProject, listManholes } from '../core/store.js';
+import { getProject, listManholes, getSettings, saveSettings } from '../core/store.js';
 import { navUrl } from '../lib/geo.js';
 import { bewerteInspektion, OBJEKTKLASSEN } from '../isybau/bewertung.js';
 
@@ -59,8 +59,28 @@ export async function renderKarte(view, projectId) {
     icon('wifiOff', 18),
     h('span', 'Kartenhintergrund kann nicht geladen werden – keine Internetverbindung oder in dieser Umgebung gesperrt (z. B. Demo-Vorschau). Die Schächte werden trotzdem angezeigt.'));
   mapEl.parentElement.append(hint);
+  // Kartenkacheln kommen von fremden Servern (BKG bzw. OpenStreetMap) – erst nach Zustimmung laden
+  const settings = await getSettings();
+  let freigabe = settings.kartenErlaubt === true;
+  const zustimmung = h('div', { class: 'map-consent card card-pad stack-sm' },
+    h('b', 'Kartenhintergrund laden?'),
+    h('p', { class: 'small', style: { margin: 0 } }, 'Dafür werden Kartenkacheln von basemap.de (Bundesamt für Kartographie und Geodäsie) bzw. OpenStreetMap geladen. Dabei wird Ihre IP-Adresse an diesen Dienst übertragen. Die Schächte sehen Sie auch ohne Hintergrund.'),
+    h('div', { class: 'row wrap' },
+      btn('Einmal laden', { small: true, variant: 'soft', onClick: () => erlauben(false) }),
+      btn('Immer laden', { small: true, variant: 'primary', onClick: () => erlauben(true) }),
+      h('a', { class: 'small', href: '#/datenschutz' }, 'Datenschutz')));
+  mapEl.parentElement.append(zustimmung);
+  zustimmung.hidden = freigabe;
+  async function erlauben(merken) {
+    freigabe = true;
+    zustimmung.hidden = true;
+    if (merken) { const s = await getSettings(); s.kartenErlaubt = true; await saveSettings(s); }
+    setLayer(state.layer);
+  }
   const setLayer = (k) => {
     if (tiles) map.removeLayer(tiles);
+    tiles = null;
+    if (!freigabe) { zustimmung.hidden = false; return; }
     const [url, attribution, maxZoom] = LAYERS[k];
     const n = { ok: 0, err: 0 };
     hint.hidden = true;

@@ -27,6 +27,7 @@ Ein Produkt von **MMSE Software Engineering** – [www.mmse-software.com](https:
 | **Offline** | Läuft ohne Netz weiter (PWA). Alle Daten liegen zuerst auf dem Gerät |
 | **Navigation** | „Schächte in der Nähe“ per GPS und Navigation zum Schacht (UTM- und Gauß-Krüger-Koordinaten werden umgerechnet) |
 | **Team-Server (optional)** | PHP + MySQL auf dem eigenen Webspace: Anmeldung (E-Mail oder Benutzername, „Passwort vergessen“), Synchronisation Handy ↔ PC, Fotos, Benutzerverwaltung mit Einladungen per E-Mail, Firmendaten und Logo zentral für alle Geräte einer Firma |
+| **Datenschutz** | Keine Cookies, kein Tracking; Impressum- und Datenschutz-Links in der App, eigene Datenschutzhinweise (`#/datenschutz`), Kartenhintergrund erst nach Einwilligung, Löschfunktionen für Benutzer und Firmen |
 | **Mehrere Firmen** | Betreiber-Bereich (MMSE): Firmen anlegen, Administrator per Einladungslink, Lizenz je Firma (Benutzerzahl, Laufzeit, Testzugang), sperren, Daten exportieren oder löschen. Jede Firma sieht nur ihre eigenen Daten |
 | **KI-Assistent (optional)** | Fotoanalyse mit Claude: schlägt Anschlüsse und sichtbare Schäden als Kodes vor – der Inspekteur bestätigt oder verwirft |
 | **Tiefe aus dem Foto (experimentell)** | Schätzung über zwei Kreise bekannter Größe (Schachthals oben, Schacht-DN unten) – nur zur Plausibilitätskontrolle |

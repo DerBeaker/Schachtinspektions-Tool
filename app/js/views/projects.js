@@ -7,9 +7,10 @@ import { fmtRelative, readFile } from '../core/util.js';
 import { pickFile } from '../lib/image.js';
 import { formatLabel } from '../isybau/export.js';
 import { APP_NAME, VENDOR, VENDOR_URL, VENDOR_WEB } from '../brand.js';
+import { rechtsLinks } from './rechtliches.js';
 
 const vendorLine = () => h('footer', { class: 'vendor-line muted small' },
-  `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB));
+  `${APP_NAME} · ${VENDOR} · `, h('a', { href: VENDOR_URL, target: '_blank', rel: 'noopener' }, VENDOR_WEB), ' · ', rechtsLinks());
 
 export async function renderProjects(view) {
   const settings = await getSettings();

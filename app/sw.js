@@ -1,5 +1,5 @@
 // Service Worker: macht die App offline-fähig (App-Dateien im Cache, API nie cachen).
-const VERSION = 'schachtblick-v10';
+const VERSION = 'schachtblick-v11';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png', './icons/mmse-logo.png',
@@ -13,7 +13,7 @@ const ASSETS = [
   './js/report/protokoll.js', './js/report/aufmass.js',
   './js/components/clockpicker.js', './js/components/photoview.js', './js/components/shaft.js',
   './js/views/projects.js', './js/views/project.js', './js/views/inspection.js', './js/views/editors.js',
-  './js/views/export.js', './js/views/settings.js', './js/views/report.js', './js/views/ai.js', './js/views/berichte.js', './js/views/betrieb.js', './js/views/zugang.js',
+  './js/views/export.js', './js/views/settings.js', './js/views/report.js', './js/views/ai.js', './js/views/berichte.js', './js/views/betrieb.js', './js/views/zugang.js', './js/views/rechtliches.js',
 ];
 
 self.addEventListener('install', (e) => {

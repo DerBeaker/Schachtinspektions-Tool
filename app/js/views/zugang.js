@@ -6,6 +6,7 @@ import { navigate, topbar } from '../core/shell.js';
 import { getSettings, saveSettings } from '../core/store.js';
 import { sync } from '../sync.js';
 import { APP_NAME, VENDOR } from '../brand.js';
+import { rechtsLinks } from './rechtliches.js';
 
 function passwortFelder(d) {
   return [
@@ -50,7 +51,8 @@ export async function renderEinladung(view, token) {
         navigate('#/', { replace: true });
       } catch (e) { toast(e.message, 'error', 5000); }
     } }),
-    h('p', { class: 'muted small' }, `${APP_NAME} · ${VENDOR}`)));
+    h('p', { class: 'muted small' }, 'Wie Ihre Daten verarbeitet werden, steht in den ', h('a', { href: '#/datenschutz' }, 'Datenschutzhinweisen'), '.'),
+    h('p', { class: 'muted small' }, `${APP_NAME} · ${VENDOR} · `, rechtsLinks())));
 }
 
 export async function renderPasswort(view, token) {

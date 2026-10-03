@@ -126,13 +126,22 @@ ersten Aufruf. Geräte laden die neue Version beim nächsten Öffnen (ggf. App e
 
 ## Vor dem Einsatz bei Kunden (Weg A: Betrieb durch MMSE)
 
-- **Auftragsverarbeitungsvertrag (AVV)** mit IONOS abschließen (im Kundenbereich unter Datenschutz)
-  und den Kundenfirmen einen AVV von MMSE anbieten – MMSE verarbeitet deren Inspektionsdaten.
-- **Impressum und Datenschutzerklärung** für die App-Adresse bereitstellen (z. B. Link auf
-  www.mmse-software.com); die Datenschutzerklärung nennt IONOS als Hoster, Kartendienste
-  (basemap.de/BKG, OpenStreetMap) und – nur falls eingeschaltet – die KI-Bildanalyse.
-- Lizenzbedingungen/Preise festlegen; im Betreiber-Bereich werden Benutzerzahl und Laufzeit je Firma
-  gepflegt, gesperrte oder abgelaufene Firmen können sich nicht mehr anmelden.
+Bereits in der App:
+- **Impressum** und **Datenschutz** sind auf der Startseite, in den Einstellungen und auf den
+  Einladungsseiten verlinkt (Impressum der Website, eigene Datenschutzhinweise der App unter `#/datenschutz`).
+- **Kein Cookie-Banner nötig:** Die App setzt keine Cookies und nutzt kein Tracking. Gespeichert wird nur,
+  was für den Betrieb nötig ist (Offline-Daten, Anmeldung) – das ist ohne Einwilligung zulässig
+  (§ 25 Abs. 2 Nr. 2 TDDDG).
+- **Karte mit Einwilligung:** Kartenkacheln von basemap.de/OpenStreetMap werden erst nach Klick geladen
+  („Einmal laden“ / „Immer laden“), widerrufbar unter Einstellungen → Darstellung.
+- Löschfunktionen: Benutzer (Firmen-Admin), ganze Firma samt Fotos (Betreiber), Fehlversuche nach 24 Stunden.
+
+Noch zu erledigen:
+- Datenschutzhinweise der App (Text in `app/js/views/rechtliches.js`) einmal **rechtlich prüfen** lassen.
+- **Auftragsverarbeitungsvertrag (AVV)** mit IONOS abschließen (im Kundenbereich unter Datenschutz) und den
+  Kundenfirmen einen AVV von MMSE anbieten – MMSE verarbeitet deren Inspektionsdaten in ihrem Auftrag.
+- **Nutzungsbedingungen/AGB** und Preise für die Kundenfirmen festlegen; Lizenzen (Benutzerzahl, Laufzeit)
+  im Betreiber-Bereich pflegen.
 - Regelmäßige Sicherung einplanen (siehe oben).
 
 ---

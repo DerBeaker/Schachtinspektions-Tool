@@ -57,6 +57,36 @@ function sb_lizenz(int $tenant): array
     ];
 }
 
+/** Protokollierte Fehlversuche höchstens 24 Stunden aufbewahren (Datensparsamkeit). */
+function sb_purge_attempts(): void
+{
+    sb_db()->prepare('DELETE FROM sb_login_attempts WHERE at < ?')->execute([time() - 86400]);
+}
+
+/** Benutzer der eigenen Firma löschen (Admin; nicht sich selbst). Datensätze bleiben erhalten. */
+function handle_user_delete(array $u): never
+{
+    sb_require_admin($u);
+    $id = (int) (sb_input(1000)['id'] ?? 0);
+    if ($id === $u['id']) {
+        sb_fail(400, 'Das eigene Konto kann nicht gelöscht werden.');
+    }
+    $db = sb_db();
+    $st = $db->prepare('SELECT operator FROM sb_users WHERE id = ? AND tenant_id = ?');
+    $st->execute([$id, $u['tenant_id']]);
+    $row = $st->fetch();
+    if (!$row) {
+        sb_fail(404, 'Benutzer nicht gefunden.');
+    }
+    if ((int) $row['operator'] === 1) {
+        sb_fail(400, 'Das Betreiber-Konto kann nicht gelöscht werden.');
+    }
+    $db->prepare('DELETE FROM sb_sessions WHERE user_id = ?')->execute([$id]);
+    $db->prepare('DELETE FROM sb_tokens WHERE user_id = ?')->execute([$id]);
+    $db->prepare('DELETE FROM sb_users WHERE id = ? AND tenant_id = ?')->execute([$id, $u['tenant_id']]);
+    sb_json(['ok' => true]);
+}
+
 /** Sitzung anlegen und die Anmeldeantwort liefern. */
 function sb_start_session(array $u): array
 {
@@ -81,6 +111,7 @@ function handle_login(): never
     $ip = substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 64);
     $db = sb_db();
     $since = time() - 900;
+    sb_purge_attempts();
     $st = $db->prepare('SELECT COUNT(*) FROM sb_login_attempts WHERE username = ? AND at > ?');
     $st->execute([$login, $since]);
     if ((int) $st->fetchColumn() >= 10) {
@@ -233,6 +264,7 @@ function handle_reset_request(): never
     $in = sb_input(2000);
     $email = strtolower(trim((string) ($in['email'] ?? '')));
     $db = sb_db();
+    sb_purge_attempts();
     $key = 'reset:' . sb_cut($email, 80);
     $st = $db->prepare('SELECT COUNT(*) FROM sb_login_attempts WHERE username = ? AND at > ?');
     $st->execute([$key, time() - 3600]);
