@@ -8,11 +8,44 @@ import { db } from '../core/db.js';
 import { BEZUG_VERTIKAL } from '../data/reflists.js';
 import { APP_NAME, APP_VERSION, VENDOR, VENDOR_URL, VENDOR_WEB, VENDOR_TAGLINE } from '../brand.js';
 import { pickFile } from '../lib/image.js';
+import { debounce, fmtDate } from '../core/util.js';
+
+export function lizenzText(l) {
+  const teile = [];
+  if (l.maxUsers) teile.push(`${l.activeUsers} von ${l.maxUsers} Benutzern`);
+  else if (l.activeUsers != null) teile.push(`${l.activeUsers} aktive Benutzer`);
+  if (l.validUntil) teile.push(`Lizenz gültig bis ${fmtDate(l.validUntil)}`);
+  return teile.join(' · ');
+}
+
+/** Einladungslink anzeigen (falls keine E-Mail ankommt, kann er weitergegeben werden). */
+export function linkSheet(r) {
+  const ta = h('textarea', { class: 'input mono', rows: 3, readonly: true, style: { fontSize: '.8rem' } }, r.link);
+  sheet({
+    title: 'Einladung erstellt',
+    body: h('div', { class: 'stack' },
+      h('p', null, r.mailed ? `Eine E-Mail an ${r.email} ist unterwegs.` : `Der Server konnte keine E-Mail senden – bitte den Link an ${r.email} weitergeben.`),
+      ta,
+      h('p', { class: 'muted small' }, 'Der Link ist 14 Tage gültig und funktioniert nur einmal.'),
+      btn('Link kopieren', { icon: 'file', variant: 'soft', onClick: async () => {
+        try { await navigator.clipboard.writeText(r.link); toast('Link kopiert.', 'ok'); } catch { ta.select(); toast('Text markiert – bitte kopieren.'); }
+      } })),
+  });
+}
 
 export async function renderSettings(view) {
   const s = await getSettings();
   const save = async () => { await saveSettings(s); };
   const set = (k) => (v) => { s[k] = v; save(); };
+  // Firmendaten liegen mit Team-Server zentral beim Mandanten: Admins ändern sie für alle Geräte
+  const zentral = !!sync.auth;
+  const darfFirma = !zentral || sync.isAdmin();
+  const pushFirma = debounce(async () => {
+    if (!zentral || !sync.isAdmin()) return;
+    try { await sync.saveFirma({ name: s.company, anschrift: s.companyAddress, kontakt: s.companyContact, logo: s.logo }); }
+    catch (e) { toast('Firmendaten nicht gespeichert: ' + e.message, 'error', 5000); }
+  }, 900);
+  const setFirma = (k) => (v) => { s[k] = v; save(); pushFirma(); };
   const main = h('main', { class: 'main' });
   const serverBox = h('div', { class: 'card card-pad stack' });
   const storageEl = h('div', { class: 'muted small' }, '…');
@@ -24,10 +57,12 @@ export async function renderSettings(view) {
         h('div', { class: 'row' }, h('div', { class: 'item-icon' }, icon('cloud')),
           h('div', { class: 'grow' }, h('h3', u.name || u.username), h('div', { class: 'muted small' }, `${u.tenant || ''} · ${sync.auth.serverUrl || 'gleicher Server'}`))),
         h('div', { class: 'muted small' }, sync.status.message || ''),
+        u.role === 'admin' && sync.auth.lizenz ? h('div', { class: 'muted small' }, lizenzText(sync.auth.lizenz)) : null,
         sync.auth.features?.ai ? h('div', { class: 'badge badge-ai' }, '✦ KI-Assistent verfügbar') : null,
         h('div', { class: 'row wrap' },
           btn('Jetzt synchronisieren', { icon: 'refresh', onClick: async () => { try { await sync.run({ manual: true }); toast('Synchronisiert.', 'ok'); } catch (e) { toast(e.message, 'error'); } renderServer(); } }),
           u.role === 'admin' ? btn('Benutzer verwalten', { icon: 'user', variant: 'soft', onClick: usersSheet }) : null,
+          u.operator ? btn('Betreiber-Bereich', { icon: 'layers', variant: 'soft', onClick: () => navigate('#/betrieb') }) : null,
           btn('Passwort ändern', { variant: 'ghost', onClick: passwordSheet }),
           btn('Abmelden', { icon: 'logout', variant: 'ghost', onClick: async () => { await sync.logout(); renderServer(); } })));
       return;
@@ -38,7 +73,7 @@ export async function renderSettings(view) {
       h('p', { class: 'muted small' }, 'Ohne Server arbeitet die App komplett auf diesem Gerät. Mit Server (PHP + MySQL auf dem eigenen Webspace) werden Projekte, Inspektionen und Fotos zwischen Handy und PC synchronisiert.'),
       field('Server-Adresse', input(d.url, (v) => { d.url = v; }, { placeholder: 'leer = gleicher Webspace (…/api/)', inputmode: 'url', autocapitalize: 'off' })),
       h('div', { class: 'grid2' },
-        field('Benutzer', input('', (v) => { d.user = v; }, { autocomplete: 'username', autocapitalize: 'off' })),
+        field('E-Mail oder Benutzer', input('', (v) => { d.user = v; }, { autocomplete: 'username', autocapitalize: 'off', inputmode: 'email' })),
         field('Passwort', input('', (v) => { d.pass = v; }, { type: 'password', autocomplete: 'current-password' }))),
       h('div', { class: 'row wrap' },
         btn('Anmelden', { icon: 'user', variant: 'primary', onClick: async () => {
@@ -51,19 +86,40 @@ export async function renderSettings(view) {
         } }),
         btn('Verbindung testen', { variant: 'ghost', onClick: async () => {
           try { const r = await sync.ping(d.url.trim()); toast(`Server erreichbar (v${r.version}${r.ai ? ', KI aktiv' : ''}).`, 'ok'); } catch (e) { toast(e.message, 'error'); }
-        } })));
+        } }),
+        btn('Passwort vergessen?', { variant: 'ghost', onClick: () => passwortVergessen(d.url.trim(), d.user.trim()) })));
   }
 
   async function usersSheet() {
     const listEl = h('div', { class: 'list' });
+    const invEl = h('div', { class: 'stack-sm' });
+    const lizEl = h('p', { class: 'muted small' });
     const load = async () => {
       try {
-        const { users } = await sync.users();
+        const [{ users, lizenz }, { invites }] = await Promise.all([sync.users(), sync.invites()]);
+        if (lizenz) { sync.auth.lizenz = lizenz; lizEl.textContent = lizenzText(lizenz); }
         clear(listEl, users.map((x) => h('div', { class: 'item', style: { cursor: 'default' } },
           h('div', { class: 'item-icon' }, icon('user')),
-          h('div', { class: 'grow' }, h('b', x.name), h('div', { class: 'meta' }, h('span', x.username), h('span', x.role === 'admin' ? 'Administrator' : 'Inspekteur'), x.active ? null : h('span', { style: { color: 'var(--danger)' } }, 'gesperrt'))),
+          h('div', { class: 'grow' }, h('b', x.name), h('div', { class: 'meta' }, h('span', x.email || x.username), h('span', x.role === 'admin' ? 'Administrator' : 'Inspekteur'), x.active ? null : h('span', { style: { color: 'var(--danger)' } }, 'gesperrt'))),
           btn('', { icon: 'edit', variant: 'ghost', aria: 'Bearbeiten', onClick: () => editUser(x) }))));
+        clear(invEl, invites.length ? [h('h3', 'Offene Einladungen'), ...invites.map((x) => h('div', { class: 'row between' },
+          h('span', { class: 'small' }, `${x.email} · ${x.role === 'admin' ? 'Administrator' : 'Inspekteur'} · bis ${fmtDate(x.expires)}`),
+          btn('Zurückziehen', { variant: 'ghost', small: true, onClick: async () => { await sync.revokeInvite(x.id); load(); } })))] : []);
       } catch (e) { clear(listEl, h('p', { class: 'muted' }, e.message)); }
+    };
+    const einladen = () => {
+      const d = { email: '', name: '', role: 'inspector' };
+      const s3 = sheet({
+        title: 'Benutzer einladen',
+        body: h('div', { class: 'stack' },
+          h('p', { class: 'muted small' }, 'Die Person bekommt einen Link per E-Mail, legt ihr Passwort selbst fest und meldet sich danach mit der E-Mail-Adresse an.'),
+          field('E-Mail-Adresse', input('', (v) => { d.email = v; }, { type: 'email', autocapitalize: 'off', inputmode: 'email' })),
+          field('Name (optional)', input('', (v) => { d.name = v; })),
+          field('Rolle', select(d.role, [['inspector', 'Inspekteur'], ['admin', 'Administrator']], (v) => { d.role = v; }))),
+        actions: [btn('Einladung senden', { icon: 'upload', variant: 'primary', onClick: async () => {
+          try { const r = await sync.invite(d); s3.close(); linkSheet(r); load(); } catch (e) { toast(e.message, 'error', 5000); }
+        } })],
+      });
     };
     const editUser = (x) => {
       const d = x ? { ...x, password: '' } : { username: '', name: '', password: '', role: 'inspector', active: true };
@@ -72,6 +128,7 @@ export async function renderSettings(view) {
         body: h('div', { class: 'stack' },
           x ? null : field('Benutzername', input('', (v) => { d.username = v; }, { autocapitalize: 'off' })),
           field('Name', input(d.name, (v) => { d.name = v; })),
+          field('E-Mail (Anmeldung, Passwort vergessen)', input(d.email || '', (v) => { d.email = v; }, { type: 'email', autocapitalize: 'off', inputmode: 'email' })),
           field(x ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 8 Zeichen)', input('', (v) => { d.password = v; }, { type: 'password', autocomplete: 'new-password' })),
           field('Rolle', select(d.role, [['inspector', 'Inspekteur'], ['admin', 'Administrator']], (v) => { d.role = v; })),
           x ? toggle(d.active, (v) => { d.active = v; }, 'aktiv') : null),
@@ -80,8 +137,30 @@ export async function renderSettings(view) {
         } })],
       });
     };
-    sheet({ title: 'Benutzer', wide: true, body: h('div', { class: 'stack' }, listEl, btn('Benutzer anlegen', { icon: 'plus', variant: 'soft', onClick: () => editUser(null) })) });
+    sheet({ title: 'Benutzer', wide: true, body: h('div', { class: 'stack' }, lizEl, listEl,
+      h('div', { class: 'row wrap' },
+        btn('Per E-Mail einladen', { icon: 'upload', variant: 'primary', onClick: einladen }),
+        btn('Direkt anlegen (mit Passwort)', { icon: 'plus', variant: 'soft', onClick: () => editUser(null) })),
+      invEl) });
     load();
+  }
+
+  async function passwortVergessen(url, user) {
+    const d = { email: /@/.test(user) ? user : '' };
+    const s2 = sheet({
+      title: 'Passwort vergessen',
+      body: h('div', { class: 'stack' },
+        h('p', { class: 'muted small' }, 'Sie bekommen einen Link per E-Mail, mit dem Sie ein neues Passwort festlegen. Ohne hinterlegte E-Mail-Adresse hilft der Administrator Ihrer Firma.'),
+        field('E-Mail-Adresse', input(d.email, (v) => { d.email = v; }, { type: 'email', autocapitalize: 'off', inputmode: 'email' }))),
+      actions: [btn('Link anfordern', { variant: 'primary', onClick: async () => {
+        try {
+          s.serverUrl = url; await save();
+          await sync.open('reset-request', { email: d.email.trim() }, url);
+          s2.close();
+          toast('Wenn die Adresse bekannt ist, ist ein Link unterwegs.', 'ok', 5000);
+        } catch (e) { toast(e.message, 'error'); }
+      } })],
+    });
   }
 
   function passwordSheet() {
@@ -101,7 +180,7 @@ export async function renderSettings(view) {
   function renderLogo() {
     clear(logoBox,
       s.logo ? h('img', { class: 'logo-preview', src: s.logo, alt: 'Firmenlogo' }) : h('div', { class: 'logo-preview empty muted small' }, 'kein Logo'),
-      h('div', { class: 'row wrap' },
+      !darfFirma ? null : h('div', { class: 'row wrap' },
         btn(s.logo ? 'Ändern' : 'Logo wählen', { icon: 'image', variant: 'soft', small: true, onClick: async () => {
           const file = await pickFile('image/png,image/jpeg,image/svg+xml,image/webp');
           if (!file) return;
@@ -109,11 +188,12 @@ export async function renderSettings(view) {
             const { logoAusDatei } = await import('./berichte.js');
             s.logo = await logoAusDatei(file);
             await save();
+            pushFirma();
             renderLogo();
             toast('Logo gespeichert.', 'ok');
           } catch (e) { toast('Bild konnte nicht gelesen werden: ' + e.message, 'error'); }
         } }),
-        s.logo ? btn('Entfernen', { icon: 'trash', variant: 'ghost', small: true, onClick: async () => { s.logo = ''; await save(); renderLogo(); } }) : null));
+        s.logo ? btn('Entfernen', { icon: 'trash', variant: 'ghost', small: true, onClick: async () => { s.logo = ''; await save(); pushFirma(); renderLogo(); } }) : null));
   }
   renderLogo();
 
@@ -126,13 +206,18 @@ export async function renderSettings(view) {
         field('Höhenangaben für neue Projekte', select(s.bezugVertikal || '1', BEZUG_VERTIKAL, set('bezugVertikal')), 'Pro Projekt unter „Projekt & Auftrag“ änderbar.')),
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Firma (Kopf der Berichte)'),
-        field('Firma (Auftragnehmer)', input(s.company, set('company'), { autocomplete: 'organization' })),
-        field('Anschrift', h('textarea', { class: 'input', rows: 2, placeholder: 'Straße Nr.\nPLZ Ort', oninput: (e) => set('companyAddress')(e.target.value) }, s.companyAddress || '')),
-        field('Kontakt', input(s.companyContact, set('companyContact'), { placeholder: 'Tel. · E-Mail · Web' })),
+        zentral ? h('p', { class: 'muted small row' }, icon('cloud', 16), h('span', darfFirma
+          ? 'Gilt für alle Geräte und Benutzer Ihrer Firma (Team-Server).'
+          : 'Wird vom Administrator Ihrer Firma gepflegt und auf alle Geräte verteilt.')) : null,
+        field('Firma (Auftragnehmer)', input(s.company, setFirma('company'), { autocomplete: 'organization', disabled: !darfFirma })),
+        field('Anschrift', h('textarea', { class: 'input', rows: 2, placeholder: 'Straße Nr.\nPLZ Ort', disabled: !darfFirma, oninput: (e) => setFirma('companyAddress')(e.target.value) }, s.companyAddress || '')),
+        field('Kontakt', input(s.companyContact, setFirma('companyContact'), { placeholder: 'Tel. · E-Mail · Web', disabled: !darfFirma })),
         h('div', { class: 'field', role: 'group', 'aria-label': 'Firmenlogo' },
           h('span', { class: 'field-label' }, 'Firmenlogo'),
           logoBox,
-          h('span', { class: 'field-hint' }, 'PNG oder JPG, erscheint oben rechts in Schachtprotokollen und im Aufmaß. Wird nur auf diesem Gerät gespeichert.'))),
+          h('span', { class: 'field-hint' }, zentral
+            ? 'PNG oder JPG, erscheint oben rechts in Schachtprotokollen und im Aufmaß.'
+            : 'PNG oder JPG, erscheint oben rechts in Schachtprotokollen und im Aufmaß. Ohne Team-Server nur auf diesem Gerät gespeichert.'))),
       h('div', { class: 'card card-pad stack' },
         h('h3', 'Darstellung'),
         field('Farbschema', select(s.theme || '', [['', 'automatisch (System)'], ['light', 'hell – besser bei Sonne'], ['dark', 'dunkel']], (v) => {

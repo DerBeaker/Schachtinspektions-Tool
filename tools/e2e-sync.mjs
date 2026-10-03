@@ -27,7 +27,7 @@ const browser = await chromium.launch();
 const step = (s) => console.log('▶', s);
 async function login(page) {
   await page.goto(url + '#/settings');
-  await page.getByLabel('Benutzer', { exact: true }).fill('max');
+  await page.getByLabel('E-Mail oder Benutzer', { exact: true }).fill('max');
   await page.getByLabel('Passwort', { exact: true }).fill('geheim-12345');
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await page.getByText('Max Prüfer').waitFor();

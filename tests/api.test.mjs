@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ const hasSqlite = hasPhp && execFileSync('php', ['-m']).toString().includes('pdo
 const hasVendor = existsSync(join(root, 'app/api/vendor/autoload.php'));
 const skip = !hasSqlite ? 'PHP mit pdo_sqlite nicht vorhanden' : false;
 
-let php, mock, base, cfgPath, mockReq = null;
+let php, mock, base, cfgPath, mailLog, mockReq = null;
 const PORT = 18000 + Math.floor(Math.random() * 1000);
 const MOCK_PORT = PORT + 1;
 
@@ -23,8 +23,12 @@ before(async () => {
   const dir = mkdtempSync(join(tmpdir(), 'sbapi-'));
   const cfg = join(dir, 'config.php');
   cfgPath = cfg;
+  mailLog = join(dir, 'mail.log');
+  // Standard SQLite; mit SB_TEST_MYSQL="mysql:host=…;dbname=…|user|pass" gegen MySQL/MariaDB (leere Datenbank)
+  const [dsn, dbUser, dbPass] = process.env.SB_TEST_MYSQL ? process.env.SB_TEST_MYSQL.split('|') : [`sqlite:${dir}/test.sqlite`];
   writeFileSync(cfg, `<?php return [
-    'db_dsn' => 'sqlite:${dir}/test.sqlite', 'db_user' => null, 'db_pass' => null,
+    'db_dsn' => ${JSON.stringify(dsn)}, 'db_user' => ${dbUser ? JSON.stringify(dbUser) : 'null'}, 'db_pass' => ${dbPass ? JSON.stringify(dbPass) : 'null'},
+    'mail_log' => '${mailLog}', 'app_url' => 'https://app.example.test/schacht/',
     'photo_dir' => '${dir}/photos', 'max_photo_mb' => 2, 'session_days' => 30, 'cors_origins' => [],
     'anthropic_api_key' => 'test-key', 'ai_base_url' => 'http://127.0.0.1:${MOCK_PORT}', 'ai_model' => 'claude-opus-5-5', 'ai_effort' => 'high',
   ];`);
@@ -138,7 +142,7 @@ test('Server: Einrichtung, Login, Sync, Fotos, Mandantentrennung', { skip }, asy
 
   // Fremder Mandant sieht nichts (zweite Firma direkt in der Datenbank anlegen)
   execFileSync('php', ['-r', `
-    $c = require getenv('SB_CONFIG'); $db = new PDO($c['db_dsn']);
+    $c = require getenv('SB_CONFIG'); $db = new PDO($c['db_dsn'], $c['db_user'], $c['db_pass']);
     $db->exec("INSERT INTO sb_tenants (name, created_at) VALUES ('Andere Firma', 0)");
     $t = $db->lastInsertId();
     $st = $db->prepare('INSERT INTO sb_users (tenant_id, username, name, pass_hash, role, active, created_at) VALUES (?, ?, ?, ?, ?, 1, 0)');
@@ -153,6 +157,112 @@ test('Server: Einrichtung, Login, Sync, Fotos, Mandantentrennung', { skip }, asy
   assert.equal(r.status, 404);
   r = await api('users', { token: token3 });
   assert.deepEqual(r.data.users.map((u) => u.username), ['fremd']);
+});
+
+test('Mehrere Firmen: Betreiber, Einladung, Lizenz, Firmendaten, Passwort vergessen', { skip }, async () => {
+  const login = async (username, password) => (await api('login', { method: 'POST', body: { username, password } }));
+  const lastLink = (kind) => {
+    const all = readFileSync(mailLog, 'utf8').match(new RegExp(`#/${kind}/([a-f0-9]{48})`, 'g')) || [];
+    return all.length ? all[all.length - 1].split('/').pop() : null;
+  };
+  // Der Einrichter ist Betreiber
+  let r = await login('admin', 'geheim-12345');
+  const op = r.data.token;
+  assert.equal(r.data.user.operator, true);
+  assert.equal(r.data.firma.name, 'Kanal Test GmbH');
+  r = await login('erika', 'sicher-1234');
+  const inspector = r.data.token;
+  assert.equal(r.data.user.operator, false);
+  assert.equal((await api('op-tenants', { token: inspector })).status, 403);
+
+  // Neue Firma mit Testlizenz (2 Benutzer) und Einladung für den Administrator
+  const morgen = new Date(Date.now() + 86400e3).toISOString().slice(0, 10);
+  r = await api('op-tenant', { method: 'POST', token: op, body: { name: 'Rohr & Kanal KG', maxUsers: 2, validUntil: morgen, adminEmail: 'Chef@Rohr-Kanal.de', adminName: 'Chef' } });
+  assert.equal(r.status, 200);
+  const firmaId = r.data.id;
+  assert.equal(r.data.invite.mailed, true);
+  assert.match(r.data.invite.link, /^https:\/\/app\.example\.test\/schacht\/#\/einladung\/[a-f0-9]{48}$/);
+  const inviteToken = lastLink('einladung');
+  assert.equal(r.data.invite.link.endsWith(inviteToken), true);
+  r = await api('invite-info', { method: 'POST', body: { token: inviteToken } });
+  assert.deepEqual([r.data.firma, r.data.email, r.data.role], ['Rohr & Kanal KG', 'chef@rohr-kanal.de', 'admin']);
+  r = await api('invite-accept', { method: 'POST', body: { token: inviteToken, name: 'Karl Chef', password: 'kurz' } });
+  assert.equal(r.status, 400);
+  r = await api('invite-accept', { method: 'POST', body: { token: inviteToken, name: 'Karl Chef', password: 'chef-pass-1' } });
+  assert.equal(r.status, 200);
+  const chef = r.data.token;
+  assert.equal(r.data.user.role, 'admin');
+  assert.equal(r.data.lizenz.maxUsers, 2);
+  assert.equal((await api('invite-accept', { method: 'POST', body: { token: inviteToken, password: 'chef-pass-1' } })).status, 410);
+  // Anmeldung mit E-Mail
+  assert.equal((await login('CHEF@rohr-kanal.de', 'chef-pass-1')).status, 200);
+
+  // Firmendaten zentral: Admin speichert, alle Geräte der Firma bekommen sie
+  const logo = 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64');
+  r = await api('firma', { method: 'POST', token: chef, body: { name: 'Rohr & Kanal KG', anschrift: 'Hauptstr. 1\n12345 Ort', kontakt: 'Tel. 1', logo } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.firma.logo, logo);
+  assert.equal((await api('firma', { method: 'POST', token: chef, body: { logo: 'javascript:alert(1)' } })).status, 400);
+  r = await api('sync', { method: 'POST', token: chef, body: { since: 0, changes: [] } });
+  assert.ok(r.data.firmaUpdated > 0);
+  assert.equal(r.data.changes.length, 0); // Daten der anderen Firmen bleiben unsichtbar
+
+  // Benutzergrenze der Lizenz
+  r = await api('invite', { method: 'POST', token: chef, body: { email: 'mia@rohr-kanal.de', role: 'inspector' } });
+  assert.equal(r.status, 200);
+  const miaToken = lastLink('einladung');
+  r = await api('invites', { token: chef });
+  assert.equal(r.data.invites.length, 1);
+  assert.equal((await api('invite-accept', { method: 'POST', body: { token: miaToken, name: 'Mia', password: 'mia-pass-12' } })).status, 200);
+  r = await api('users', { method: 'POST', token: chef, body: { username: 'dritter', name: 'Dritter', password: 'dritter-123' } });
+  assert.equal(r.status, 409);
+  assert.match(r.data.error, /höchstens 2/);
+  r = await api('invite', { method: 'POST', token: chef, body: { email: 'vierter@rohr-kanal.de' } });
+  assert.equal(r.status, 409);
+
+  // Passwort vergessen (keine Auskunft über unbekannte Adressen)
+  assert.equal((await api('reset-request', { method: 'POST', body: { email: 'gibts@nicht.de' } })).status, 200);
+  r = await api('reset-request', { method: 'POST', body: { email: 'mia@rohr-kanal.de' } });
+  assert.equal(r.status, 200);
+  const resetToken = lastLink('passwort');
+  assert.ok(resetToken);
+  r = await api('reset', { method: 'POST', body: { token: resetToken, password: 'neues-pass-9' } });
+  assert.equal(r.status, 200);
+  assert.equal((await login('mia@rohr-kanal.de', 'mia-pass-12')).status, 403);
+  assert.equal((await login('mia@rohr-kanal.de', 'neues-pass-9')).status, 200);
+  assert.equal((await api('reset', { method: 'POST', body: { token: resetToken, password: 'nochmal-123' } })).status, 410);
+
+  // Übersicht für den Betreiber
+  r = await api('op-tenants', { token: op });
+  const t = r.data.tenants.find((x) => x.id === firmaId);
+  assert.deepEqual([t.activeUsers, t.maxUsers, t.validUntil, t.own], [2, 2, morgen, false]);
+  assert.equal(t.admins[0].email, 'chef@rohr-kanal.de');
+  assert.ok(r.data.tenants.find((x) => x.own));
+
+  // Lizenz abgelaufen bzw. Firma gesperrt -> kein Zugang mehr
+  r = await api('op-tenant', { method: 'POST', token: op, body: { id: firmaId, name: 'Rohr & Kanal KG', maxUsers: 2, validUntil: '2020-01-31' } });
+  assert.equal(r.status, 200);
+  r = await api('sync', { method: 'POST', token: chef, body: { since: 0, changes: [] } });
+  assert.equal(r.status, 403);
+  assert.match(r.data.error, /31\.01\.2020 abgelaufen/);
+  assert.equal((await login('chef@rohr-kanal.de', 'chef-pass-1')).status, 403);
+  await api('op-tenant', { method: 'POST', token: op, body: { id: firmaId, name: 'Rohr & Kanal KG', active: false } });
+  r = await login('chef@rohr-kanal.de', 'chef-pass-1');
+  assert.match(r.data.error, /gesperrt/);
+  r = await api('op-tenant', { method: 'POST', token: op, body: { id: r.data.id ?? 1, name: 'Kanal Test GmbH', active: false } });
+  assert.equal(r.status, 400); // eigene Firma nicht sperrbar
+
+  // Export und Löschen einer Firma
+  r = await api('op-export', { token: op, query: `&tenant=${firmaId}` });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.benutzer.map((u) => u.email).sort(), ['chef@rohr-kanal.de', 'mia@rohr-kanal.de']);
+  assert.ok(!JSON.stringify(r.data).includes('pass_hash'));
+  assert.equal((await api('op-tenant-delete', { method: 'POST', token: op, body: { id: firmaId, confirm: 'falsch' } })).status, 400);
+  r = await api('op-tenant-delete', { method: 'POST', token: op, body: { id: firmaId, confirm: 'Rohr & Kanal KG' } });
+  assert.equal(r.status, 200);
+  r = await api('op-tenants', { token: op });
+  assert.ok(!r.data.tenants.some((x) => x.id === firmaId));
+  assert.equal((await login('mia@rohr-kanal.de', 'neues-pass-9')).status, 403);
 });
 
 test('KI-Route: Anfrage an Claude und Bereinigung der Antwort', { skip: skip || (!hasVendor && 'vendor/ fehlt (composer install)') }, async () => {

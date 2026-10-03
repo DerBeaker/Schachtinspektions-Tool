@@ -22,18 +22,21 @@ try {
 if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $msg === '') {
     $company = trim((string) ($_POST['company'] ?? ''));
     $name = trim((string) ($_POST['name'] ?? ''));
-    $username = strtolower(trim((string) ($_POST['username'] ?? '')));
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+    $username = strtolower(trim((string) ($_POST['username'] ?? ''))) ?: $email;
     $password = (string) ($_POST['password'] ?? '');
-    if ($company === '' || !preg_match('/^[a-z0-9._@-]{3,80}$/', $username) || strlen($password) < 10) {
-        $msg = 'Bitte Firma, Benutzername (a–z, 0–9, . _ - @) und ein Passwort mit mindestens 10 Zeichen angeben.';
+    if ($company === '' || !preg_match('/^[a-z0-9._@-]{3,80}$/', $username) || strlen($password) < 10
+        || ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+        $msg = 'Bitte Firma, E-Mail-Adresse oder Benutzername (a–z, 0–9, . _ - @) und ein Passwort mit mindestens 10 Zeichen angeben.';
     } else {
         sb_install_schema();
         $db = sb_db();
         $db->beginTransaction();
         $db->prepare('INSERT INTO sb_tenants (name, created_at) VALUES (?, ?)')->execute([$company, time()]);
         $tenant = (int) $db->lastInsertId();
-        $db->prepare('INSERT INTO sb_users (tenant_id, username, name, pass_hash, role, active, created_at) VALUES (?, ?, ?, ?, \'admin\', 1, ?)')
-            ->execute([$tenant, $username, $name !== '' ? $name : $username, password_hash($password, PASSWORD_DEFAULT), time()]);
+        // erster Benutzer = Administrator seiner Firma und Betreiber der Installation
+        $db->prepare('INSERT INTO sb_users (tenant_id, username, email, name, pass_hash, role, active, operator, created_at) VALUES (?, ?, ?, ?, ?, \'admin\', 1, 1, ?)')
+            ->execute([$tenant, $username, $email !== '' ? $email : null, $name !== '' ? $name : $username, password_hash($password, PASSWORD_DEFAULT), time()]);
         $db->commit();
         $ok = true;
     }
@@ -60,17 +63,19 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $msg === '')
 <?php if ($ok): ?>
   <p class="msg ok">Fertig! Die Datenbank ist eingerichtet und der Administrator angelegt.</p>
   <p>Öffne jetzt die App, gehe auf <b>Einstellungen → Team-Server</b> und melde dich an. Weitere Benutzer legst du dort unter „Benutzer verwalten“ an.</p>
+  <p>Weitere Firmen (Kunden) legst du als Betreiber unter <b>Einstellungen → Betreiber-Bereich</b> an – jede Firma bekommt eine Einladung für ihren eigenen Administrator.</p>
   <p><a href="../">→ Zur App</a></p>
 <?php elseif ($installed): ?>
   <p class="msg ok">Der Server ist bereits eingerichtet. Diese Seite ist gesperrt.</p>
   <p><a href="../">→ Zur App</a></p>
 <?php else: ?>
-  <p>Legt die Tabellen in der Datenbank an und erstellt den ersten Administrator.</p>
+  <p>Legt die Tabellen in der Datenbank an und erstellt den ersten Administrator. Diese erste Firma ist der <b>Betreiber</b> der Installation (z. B. MMSE Software Engineering) und kann später weitere Firmen anlegen.</p>
   <?php if ($msg): ?><p class="msg"><?= $msg ?></p><?php endif; ?>
   <form method="post" autocomplete="off">
     <label for="company">Firma</label><input id="company" name="company" required value="<?= htmlspecialchars($_POST['company'] ?? '') ?>">
     <label for="name">Dein Name</label><input id="name" name="name" value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
-    <label for="username">Benutzername</label><input id="username" name="username" required autocapitalize="off" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>">
+    <label for="email">E-Mail-Adresse (Anmeldung, „Passwort vergessen“)</label><input id="email" name="email" type="email" autocapitalize="off" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+    <label for="username">Benutzername (optional, sonst E-Mail)</label><input id="username" name="username" autocapitalize="off" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>">
     <label for="password">Passwort (mind. 10 Zeichen)</label><input id="password" name="password" type="password" required minlength="10">
     <button type="submit">Einrichten</button>
   </form>

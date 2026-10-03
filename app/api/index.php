@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/lib/bootstrap.php';
 require __DIR__ . '/lib/schema.php';
+require __DIR__ . '/lib/firmen.php';
 
 set_exception_handler(function (Throwable $e) {
     error_log('[schachtblick] ' . $e);
@@ -12,6 +13,7 @@ set_exception_handler(function (Throwable $e) {
 });
 
 sb_cors();
+sb_migrate_if_needed();
 $route = $_GET['r'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
@@ -30,7 +32,50 @@ switch ("$method $route") {
         sb_json(['ok' => true]);
 
     case 'GET me':
-        sb_json(['user' => sb_public_user(sb_user()), 'features' => ['ai' => sb_ai_enabled()]]);
+        $u = sb_user();
+        sb_json(['user' => sb_public_user($u), 'features' => ['ai' => sb_ai_enabled()], 'firma' => sb_firma($u['tenant_id']), 'lizenz' => sb_lizenz($u['tenant_id'])]);
+
+    case 'GET firma':
+        sb_json(['firma' => sb_firma(sb_user()['tenant_id'])]);
+
+    case 'POST firma':
+        handle_firma_save(sb_user());
+
+    case 'POST invite':
+        handle_invite(sb_user());
+
+    case 'GET invites':
+        handle_invites(sb_user());
+
+    case 'POST invite-revoke':
+        handle_invite_revoke(sb_user());
+
+    case 'POST invite-info':
+        handle_invite_info();
+
+    case 'POST invite-accept':
+        handle_invite_accept();
+
+    case 'POST reset-request':
+        handle_reset_request();
+
+    case 'POST reset':
+        handle_reset();
+
+    case 'GET op-tenants':
+        handle_op_tenants(sb_user());
+
+    case 'POST op-tenant':
+        handle_op_tenant_save(sb_user());
+
+    case 'POST op-invite':
+        handle_op_invite(sb_user());
+
+    case 'POST op-tenant-delete':
+        handle_op_tenant_delete(sb_user());
+
+    case 'GET op-export':
+        handle_op_export(sb_user());
 
     case 'POST sync':
         handle_sync(sb_user());
@@ -44,9 +89,12 @@ switch ("$method $route") {
     case 'GET users':
         $u = sb_user();
         sb_require_admin($u);
-        $st = sb_db()->prepare('SELECT id, username, name, role, active FROM sb_users WHERE tenant_id = ? ORDER BY name');
+        $st = sb_db()->prepare('SELECT id, username, email, name, role, active, last_login FROM sb_users WHERE tenant_id = ? ORDER BY name');
         $st->execute([$u['tenant_id']]);
-        sb_json(['users' => array_map(fn($r) => ['id' => (int) $r['id'], 'username' => $r['username'], 'name' => $r['name'], 'role' => $r['role'], 'active' => (bool) $r['active']], $st->fetchAll())]);
+        sb_json(['users' => array_map(fn($r) => [
+            'id' => (int) $r['id'], 'username' => $r['username'], 'email' => $r['email'], 'name' => $r['name'], 'role' => $r['role'],
+            'active' => (bool) $r['active'], 'lastLogin' => $r['last_login'] !== null ? (int) $r['last_login'] : null,
+        ], $st->fetchAll()), 'lizenz' => sb_lizenz($u['tenant_id'])]);
 
     case 'POST users':
         handle_user_save(sb_user());
@@ -67,39 +115,6 @@ switch ("$method $route") {
 }
 
 // ---------------------------------------------------------------------------
-
-function handle_login(): never
-{
-    $in = sb_input(10_000);
-    $username = trim((string) ($in['username'] ?? ''));
-    $password = (string) ($in['password'] ?? '');
-    $ip = substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 64);
-    $db = sb_db();
-    $since = time() - 900;
-    $st = $db->prepare('SELECT COUNT(*) FROM sb_login_attempts WHERE username = ? AND at > ?');
-    $st->execute([$username, $since]);
-    if ((int) $st->fetchColumn() >= 10) {
-        sb_fail(429, 'Zu viele Fehlversuche – bitte 15 Minuten warten.');
-    }
-    $st = $db->prepare('SELECT u.*, t.name AS tenant FROM sb_users u JOIN sb_tenants t ON t.id = u.tenant_id WHERE u.username = ? AND u.active = 1');
-    $st->execute([$username]);
-    $u = $st->fetch();
-    if (!$u || !password_verify($password, $u['pass_hash'])) {
-        $db->prepare('INSERT INTO sb_login_attempts (username, ip, at) VALUES (?, ?, ?)')->execute([$username, $ip, time()]);
-        usleep(400_000);
-        sb_fail(403, 'Benutzername oder Passwort falsch.');
-    }
-    if (password_needs_rehash($u['pass_hash'], PASSWORD_DEFAULT)) {
-        $db->prepare('UPDATE sb_users SET pass_hash = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $u['id']]);
-    }
-    $db->prepare('DELETE FROM sb_login_attempts WHERE username = ? OR at < ?')->execute([$username, $since]);
-    $db->prepare('DELETE FROM sb_sessions WHERE expires_at < ?')->execute([time()]);
-    $token = bin2hex(random_bytes(32));
-    $days = (int) (sb_config()['session_days'] ?? 30);
-    $db->prepare('INSERT INTO sb_sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-        ->execute([hash('sha256', $token), $u['id'], time(), time() + $days * 86400]);
-    sb_json(['token' => $token, 'user' => sb_public_user($u), 'features' => ['ai' => sb_ai_enabled()]]);
-}
 
 function handle_sync(array $u): never
 {
@@ -181,7 +196,9 @@ function handle_sync(array $u): never
         }
         $photos[] = ['id' => $p['id'], 'inspectionId' => $p['inspection_id'], 'projectId' => $p['project_id'], 'width' => $p['width'] !== null ? (int) $p['width'] : null, 'height' => $p['height'] !== null ? (int) $p['height'] : null, 'createdAt' => (int) $p['created_at']];
     }
-    sb_json(['rev' => $maxRev, 'more' => $more, 'changes' => $out, 'photos' => $photos, 'accepted' => $accepted, 'skipped' => $skipped]);
+    $st = $db->prepare('SELECT firma_updated FROM sb_tenants WHERE id = ?');
+    $st->execute([$tenant]);
+    sb_json(['rev' => $maxRev, 'more' => $more, 'changes' => $out, 'photos' => $photos, 'accepted' => $accepted, 'skipped' => $skipped, 'firmaUpdated' => (int) $st->fetchColumn()]);
 }
 
 function sb_photo_path(int $tenant, string $id): string
@@ -260,8 +277,14 @@ function handle_user_save(array $u): never
         if ($id === $u['id'] && ($role !== 'admin' || empty($in['active']))) {
             sb_fail(400, 'Du kannst dich nicht selbst sperren oder herabstufen.');
         }
-        $db->prepare('UPDATE sb_users SET name = ?, role = ?, active = ? WHERE id = ?')
-            ->execute([$name !== '' ? $name : 'Benutzer', $role, !empty($in['active']) ? 1 : 0, $id]);
+        $st = $db->prepare('SELECT active FROM sb_users WHERE id = ?');
+        $st->execute([$id]);
+        if (!empty($in['active']) && !(int) $st->fetchColumn()) {
+            sb_check_user_limit($u['tenant_id']);
+        }
+        $email = sb_user_email($in, $id);
+        $db->prepare('UPDATE sb_users SET name = ?, role = ?, active = ?, email = ? WHERE id = ?')
+            ->execute([$name !== '' ? $name : 'Benutzer', $role, !empty($in['active']) ? 1 : 0, $email, $id]);
         if ($password !== '') {
             if (strlen($password) < 8) {
                 sb_fail(400, 'Passwort muss mindestens 8 Zeichen haben.');
@@ -278,14 +301,34 @@ function handle_user_save(array $u): never
     if (strlen($password) < 8) {
         sb_fail(400, 'Passwort muss mindestens 8 Zeichen haben.');
     }
-    $st = $db->prepare('SELECT id FROM sb_users WHERE username = ?');
-    $st->execute([$username]);
+    $st = $db->prepare('SELECT id FROM sb_users WHERE username = ? OR email = ?');
+    $st->execute([$username, $username]);
     if ($st->fetch()) {
         sb_fail(409, 'Benutzername ist bereits vergeben.');
     }
-    $db->prepare('INSERT INTO sb_users (tenant_id, username, name, pass_hash, role, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)')
-        ->execute([$u['tenant_id'], $username, $name !== '' ? $name : $username, password_hash($password, PASSWORD_DEFAULT), $role, time()]);
+    sb_check_user_limit($u['tenant_id']);
+    $email = sb_user_email($in, 0) ?? (sb_valid_email($username) ? $username : null);
+    $db->prepare('INSERT INTO sb_users (tenant_id, username, email, name, pass_hash, role, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)')
+        ->execute([$u['tenant_id'], $username, $email, $name !== '' ? $name : $username, password_hash($password, PASSWORD_DEFAULT), $role, time()]);
     sb_json(['ok' => true, 'id' => (int) $db->lastInsertId()]);
+}
+
+/** E-Mail aus dem Formular prüfen (leer = keine); muss eindeutig sein. */
+function sb_user_email(array $in, int $id): ?string
+{
+    $email = strtolower(trim((string) ($in['email'] ?? '')));
+    if ($email === '') {
+        return null;
+    }
+    if (!sb_valid_email($email)) {
+        sb_fail(400, 'E-Mail-Adresse ist ungültig.');
+    }
+    $st = sb_db()->prepare('SELECT id FROM sb_users WHERE (email = ? OR username = ?) AND id <> ?');
+    $st->execute([$email, $email, $id]);
+    if ($st->fetch()) {
+        sb_fail(409, 'Diese E-Mail-Adresse wird bereits verwendet.');
+    }
+    return $email;
 }
 
 function handle_password(array $u): never

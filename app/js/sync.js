@@ -4,7 +4,7 @@
 // Konflikte: der zuletzt geänderte Datensatz gewinnt (pro Inspektion/Schacht).
 
 import { db } from './core/db.js';
-import { onChange } from './core/store.js';
+import { onChange, getSettings, saveSettings } from './core/store.js';
 import { debounce } from './core/util.js';
 
 const TYPES = ['projects', 'manholes', 'inspections'];
@@ -55,11 +55,22 @@ export const sync = {
 
   async login(serverUrl, username, password) {
     const res = await this.request('login', { method: 'POST', body: { username, password }, auth: { serverUrl } });
-    this.auth = { serverUrl, token: res.token, user: res.user, features: res.features || {} };
+    return this.loginWith(serverUrl, res);
+  },
+
+  /** Anmeldeantwort übernehmen (Login, angenommene Einladung). */
+  async loginWith(serverUrl, res) {
+    this.auth = { serverUrl, token: res.token, user: res.user, features: res.features || {}, lizenz: res.lizenz || null };
     await db.setMeta('auth', this.auth);
+    if (res.firma) await this.applyFirma(res.firma).catch(() => {});
     this.set({ enabled: true, state: 'idle', message: `Angemeldet als ${res.user.name || res.user.username}` });
     this.run();
     return res.user;
+  },
+
+  /** Öffentliche Aufrufe ohne Anmeldung (Einladung, Passwort vergessen). */
+  open(route, body, serverUrl = '') {
+    return this.request(route, { method: 'POST', body, auth: { serverUrl } });
   },
 
   async logout() {
@@ -70,7 +81,40 @@ export const sync = {
   async logoutLocal() {
     this.auth = null;
     await db.setMeta('auth', null);
+    const s = await getSettings();
+    if (s.firmaZentral) { s.firmaZentral = false; await saveSettings(s); }
     this.set({ enabled: false, state: 'idle', message: 'Nicht angemeldet' });
+  },
+
+  isAdmin() { return this.auth?.user?.role === 'admin'; },
+  isOperator() { return !!this.auth?.user?.operator; },
+
+  /**
+   * Firmendaten vom Server (Name, Anschrift, Kontakt, Logo) in die Einstellungen übernehmen.
+   * Hat der Server noch keine, übernimmt ein Administrator die bisher lokal gepflegten.
+   */
+  async applyFirma(f) {
+    const s = await getSettings();
+    if (!f.updated) {
+      if (this.isAdmin() && (s.companyAddress || s.companyContact || s.logo)) {
+        const r = await this.saveFirma({ name: f.name, anschrift: s.companyAddress, kontakt: s.companyContact, logo: s.logo });
+        f = r.firma;
+      } else {
+        if (!s.company) s.company = f.name;
+        s.firmaZentral = true;
+        await saveSettings(s);
+        return;
+      }
+    }
+    Object.assign(s, { company: f.name, companyAddress: f.anschrift || '', companyContact: f.kontakt || '', logo: f.logo || '', firmaZentral: true });
+    await saveSettings(s);
+    await db.setMeta('firmaUpdated', f.updated || 0);
+  },
+
+  async saveFirma(f) {
+    const r = await this.request('firma', { method: 'POST', body: f });
+    await db.setMeta('firmaUpdated', r.firma?.updated || 0);
+    return r;
   },
 
   async init() {
@@ -84,7 +128,11 @@ export const sync = {
     setInterval(() => { if (navigator.onLine) this.run(); }, 120000);
     if (this.auth) {
       this.run();
-      this.request('me').then((r) => { this.auth.features = r.features || {}; this.auth.user = r.user; db.setMeta('auth', this.auth); }).catch(() => {});
+      this.request('me').then(async (r) => {
+        Object.assign(this.auth, { features: r.features || {}, user: r.user, lizenz: r.lizenz || null });
+        await db.setMeta('auth', this.auth);
+        if (r.firma && r.firma.updated !== (await db.getMeta('firmaUpdated', 0))) await this.applyFirma(r.firma);
+      }).catch(() => {});
     }
   },
 
@@ -143,6 +191,11 @@ export const sync = {
         since = res.rev;
         res = await this.request('sync', { method: 'POST', body: { since, changes: [] } });
       }
+      // Firmendaten (Logo, Anschrift) geändert? Dann für Berichte übernehmen
+      if (res.firmaUpdated && res.firmaUpdated !== (await db.getMeta('firmaUpdated', 0))) {
+        const f = await this.request('firma');
+        if (f.firma) await this.applyFirma(f.firma);
+      }
       const now = Date.now();
       await db.setMeta('lastSync', now);
       this.set({ state: 'ok', lastSync: now, message: `Synchronisiert ${new Date(now).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` });
@@ -168,6 +221,15 @@ export const sync = {
 
   users() { return this.request('users'); },
   saveUser(u) { return this.request('users', { method: 'POST', body: u }); },
+  invite(d) { return this.request('invite', { method: 'POST', body: d }); },
+  invites() { return this.request('invites'); },
+  revokeInvite(id) { return this.request('invite-revoke', { method: 'POST', body: { id } }); },
+  // Betreiber-Bereich
+  opTenants() { return this.request('op-tenants'); },
+  opSaveTenant(t) { return this.request('op-tenant', { method: 'POST', body: t }); },
+  opInvite(d) { return this.request('op-invite', { method: 'POST', body: d }); },
+  opDeleteTenant(id, confirm) { return this.request('op-tenant-delete', { method: 'POST', body: { id, confirm } }); },
+  opExport(tenant) { return this.request('op-export', { query: { tenant } }); },
   changePassword(oldPw, newPw) { return this.request('password', { method: 'POST', body: { old: oldPw, new: newPw } }); },
 
   async ai(payload) {

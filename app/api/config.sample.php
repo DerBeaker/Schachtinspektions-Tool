@@ -17,6 +17,14 @@ return [
     // Sitzungsdauer in Tagen
     'session_days' => 30,
 
+    // Adresse der App für Links in E-Mails (Einladungen, „Passwort vergessen“).
+    // Leer = automatisch (Ordner über api/), z. B. 'https://app.mmse-software.com/'
+    'app_url' => '',
+    // Absender der E-Mails. Bei IONOS ein vorhandenes Postfach der eigenen Domain verwenden.
+    'mail_from' => 'noreply@mmse-software.com',
+    // false = keine E-Mails senden (Links werden dann nur in der App angezeigt)
+    'mail' => true,
+
     // Nur nötig, wenn App und API auf unterschiedlichen Domains liegen, z. B. ['https://app.example.de']
     'cors_origins' => [],
 

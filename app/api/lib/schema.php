@@ -51,6 +51,93 @@ function sb_install_schema(): void
     foreach (sb_schema_sql(sb_driver()) as $sql) {
         sb_db()->exec($sql);
     }
+    sb_migrate();
+}
+
+// ---------------------------------------------------------------- Migrationen
+
+const SB_SCHEMA_VERSION = 2;
+
+function sb_columns(string $table): array
+{
+    $db = sb_db();
+    if (sb_driver() === 'sqlite') {
+        return array_map(fn($r) => $r['name'], $db->query("PRAGMA table_info($table)")->fetchAll());
+    }
+    return array_map(fn($r) => $r['Field'], $db->query("SHOW COLUMNS FROM $table")->fetchAll());
+}
+
+function sb_add_column(string $table, string $column, string $sqlite, string $mysql): void
+{
+    if (!in_array($column, sb_columns($table), true)) {
+        sb_db()->exec("ALTER TABLE $table ADD COLUMN $column " . (sb_driver() === 'sqlite' ? $sqlite : $mysql));
+    }
+}
+
+function sb_has_index(string $table, string $name): bool
+{
+    $db = sb_db();
+    if (sb_driver() === 'sqlite') {
+        $st = $db->prepare("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?");
+        $st->execute([$name]);
+        return (int) $st->fetchColumn() > 0;
+    }
+    $st = $db->prepare("SHOW INDEX FROM $table WHERE Key_name = ?");
+    $st->execute([$name]);
+    return (bool) $st->fetch();
+}
+
+/**
+ * Version 2 (mehrere Firmen): Lizenzfelder und Firmendaten je Mandant, E-Mail-Anmeldung,
+ * Betreiber-Kennzeichen, Einladungen und Passwort-Links.
+ */
+function sb_migrate(): void
+{
+    $db = sb_db();
+    $lite = sb_driver() === 'sqlite';
+    $opt = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+    $db->exec($lite
+        ? 'CREATE TABLE IF NOT EXISTS sb_meta (k TEXT PRIMARY KEY, v TEXT)'
+        : "CREATE TABLE IF NOT EXISTS sb_meta (k VARCHAR(40) PRIMARY KEY, v TEXT) $opt");
+    $db->exec($lite
+        ? 'CREATE TABLE IF NOT EXISTS sb_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
+            tenant_id INTEGER NOT NULL, user_id INTEGER, email TEXT, name TEXT, role TEXT, created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL, used_at INTEGER, created_by INTEGER)'
+        : "CREATE TABLE IF NOT EXISTS sb_tokens (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, token_hash CHAR(64) NOT NULL UNIQUE, kind VARCHAR(10) NOT NULL,
+            tenant_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NULL, email VARCHAR(190) NULL, name VARCHAR(120) NULL, role VARCHAR(20) NULL,
+            created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL, used_at BIGINT NULL, created_by INT UNSIGNED NULL, INDEX (tenant_id)) $opt");
+    sb_add_column('sb_tenants', 'active', 'INTEGER NOT NULL DEFAULT 1', 'TINYINT NOT NULL DEFAULT 1');
+    sb_add_column('sb_tenants', 'max_users', 'INTEGER', 'INT NULL');
+    sb_add_column('sb_tenants', 'valid_until', 'INTEGER', 'BIGINT NULL');
+    sb_add_column('sb_tenants', 'note', 'TEXT', 'TEXT NULL');
+    sb_add_column('sb_tenants', 'contact', 'TEXT', 'VARCHAR(190) NULL');
+    sb_add_column('sb_tenants', 'firma', 'TEXT', 'MEDIUMTEXT NULL');
+    sb_add_column('sb_tenants', 'firma_updated', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
+    sb_add_column('sb_users', 'email', 'TEXT', 'VARCHAR(190) NULL');
+    sb_add_column('sb_users', 'operator', 'INTEGER NOT NULL DEFAULT 0', 'TINYINT NOT NULL DEFAULT 0');
+    sb_add_column('sb_users', 'last_login', 'INTEGER', 'BIGINT NULL');
+    if (!sb_has_index('sb_users', 'sb_users_email')) {
+        $db->exec('CREATE UNIQUE INDEX sb_users_email ON sb_users (email)');
+    }
+    // bestehende Installation: der erste Administrator wird Betreiber
+    if ((int) $db->query('SELECT COUNT(*) FROM sb_users WHERE operator = 1')->fetchColumn() === 0) {
+        $db->exec("UPDATE sb_users SET operator = 1 WHERE id = (SELECT id FROM (SELECT MIN(id) AS id FROM sb_users WHERE role = 'admin') x)");
+    }
+    $st = $db->prepare($lite ? 'INSERT OR REPLACE INTO sb_meta (k, v) VALUES (?, ?)' : 'REPLACE INTO sb_meta (k, v) VALUES (?, ?)');
+    $st->execute(['schema', (string) SB_SCHEMA_VERSION]);
+}
+
+/** Vor jeder Anfrage: Schema bei Bedarf nachziehen (nach einem Update der Dateien). */
+function sb_migrate_if_needed(): void
+{
+    try {
+        $v = (int) sb_db()->query("SELECT v FROM sb_meta WHERE k = 'schema'")->fetchColumn();
+    } catch (Throwable) {
+        $v = 0;
+    }
+    if ($v < SB_SCHEMA_VERSION && sb_is_installed()) {
+        sb_migrate();
+    }
 }
 
 function sb_is_installed(): bool
